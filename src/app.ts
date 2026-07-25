@@ -86,7 +86,44 @@ const SHARED_CSS = `
   #sample:focus {
     outline: 2px solid var(--tt-blue); outline-offset: 1px;
   }
+  .table-name-row { margin: 1rem 0 0; }
+  #table-name {
+    width: min(100%, 20rem); padding: 0.55rem 0.75rem;
+    border: 1px solid var(--tt-line); border-radius: var(--tt-radius);
+    font-family: var(--tt-font-mono); font-size: 0.9rem; color: var(--tt-ink);
+    background: #fff;
+  }
+  #table-name:focus { outline: 2px solid var(--tt-blue); outline-offset: 1px; }
+  .error {
+    margin: 0.75rem 0 0; padding: 0.65rem 0.8rem;
+    border-left: 3px solid var(--tt-clay); color: var(--tt-ink);
+    background: color-mix(in srgb, var(--tt-clay) 12%, var(--tt-paper));
+    font-size: 0.92rem;
+  }
+  .mapping-note { font-size: 0.9rem; color: var(--tt-muted); }
+  .column-list { display: flex; flex-direction: column; gap: 0.45rem; margin: 0.75rem 0 0; }
+  .column-row {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.65rem;
+  }
+  .col-name { min-width: 10rem; font-size: 0.85rem; }
+  .column-row select {
+    font-family: var(--tt-font-mono); font-size: 0.82rem;
+    padding: 0.35rem 0.5rem; border: 1px solid var(--tt-line);
+    border-radius: var(--tt-radius); background: #fff; color: var(--tt-ink);
+  }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
   .outputs { margin-top: 2rem; }
+  .output-block { margin-top: 1.25rem; }
+  .output-block pre {
+    margin: 0; padding: 0.9rem 1rem; overflow: auto;
+    border: 1px solid var(--tt-line); border-radius: var(--tt-radius);
+    background: color-mix(in srgb, var(--tt-blue) 6%, #fff);
+    font-family: var(--tt-font-mono); font-size: 0.82rem; line-height: 1.45;
+    color: var(--tt-ink); white-space: pre;
+  }
   footer {
     margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--tt-line);
     display: flex; align-items: center; gap: 0.45rem; font-size: 0.85rem;
@@ -170,9 +207,19 @@ function renderHome(): string {
       </div>
       <textarea id="sample" name="sample" spellcheck="false" placeholder="Paste a CSV header plus a few rows, or a JSON object / array."></textarea>
 
+      <div class="table-name-row">
+        <label class="field-label" for="table-name">Table name</label>
+        <input id="table-name" name="table-name" type="text" value="MY_TABLE" spellcheck="false" autocomplete="off" />
+      </div>
+
+      <p id="parse-error" class="error" hidden></p>
+      <div id="column-mapping" hidden></div>
+
       <section class="outputs" aria-live="polite">
-        <h2>Output</h2>
-        <p class="mono">SQL blocks land in the next commits.</p>
+        <div class="output-block">
+          <h2>CREATE TABLE</h2>
+          <pre id="create-sql"></pre>
+        </div>
       </section>
     `,
   });
