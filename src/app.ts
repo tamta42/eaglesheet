@@ -1,6 +1,9 @@
 import { CLIENT_SCRIPT } from "./client-script";
 import { html, methodNotAllowed } from "./http";
+import { LINT_SCRIPT } from "./lint-script";
 import type { AppContext } from "./platform";
+
+type NavKey = "hub" | "scaffold" | "lint" | "about" | "privacy";
 
 const THEME_DEFAULT = "dark";
 
@@ -100,10 +103,41 @@ const SHARED_CSS = `
   .brand-tag {
     display: block; font-size: 0.72rem; font-weight: 500; color: var(--tt-muted);
   }
-  .nav { display: flex; align-items: center; gap: 1rem; }
+  .nav { display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap; justify-content: flex-end; }
   .nav a { font-size: 0.9rem; color: var(--tt-muted); }
   .nav a:hover { color: var(--tt-blue); }
+  .nav a.is-active { color: var(--tt-blue); font-weight: 600; }
   .page { flex: 1; width: min(760px, 100%); margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+  .tool-list { list-style: none; padding: 0; margin: 1.5rem 0 0; display: flex; flex-direction: column; gap: 1.25rem; }
+  .tool-list li { margin: 0; padding: 0; }
+  .tool-list a.tool-name {
+    display: inline-block; font-size: 1.15rem; font-weight: 600;
+    color: var(--tt-blue); text-decoration: none; letter-spacing: -0.02em;
+  }
+  .tool-list a.tool-name:hover { color: var(--tt-clay); }
+  .tool-list p { margin: 0.3rem 0 0; color: var(--tt-muted); font-size: 0.95rem; }
+  .findings { margin-top: 1.25rem; display: flex; flex-direction: column; gap: 0.55rem; }
+  .finding {
+    padding: 0.65rem 0.8rem; border-left: 3px solid var(--tt-line);
+    background: var(--tt-surface); font-size: 0.92rem; line-height: 1.45;
+  }
+  .finding.error { border-left-color: #c45c5c; }
+  .finding.warn { border-left-color: var(--tt-clay); }
+  .finding.info { border-left-color: var(--tt-slate); }
+  .finding-meta {
+    font-family: var(--tt-font-mono); font-size: 0.72rem; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--tt-muted); margin: 0 0 0.25rem;
+  }
+  .finding-msg { margin: 0; color: var(--tt-ink); }
+  #sql-input {
+    width: 100%; min-height: 14rem; resize: vertical;
+    padding: 0.85rem 1rem; border: 1px solid var(--tt-line);
+    border-radius: var(--tt-radius); background: var(--tt-surface);
+    color: var(--tt-ink); font-family: var(--tt-font-mono); font-size: 0.85rem;
+    line-height: 1.45;
+  }
+  #sql-input:focus { outline: 2px solid var(--tt-blue); outline-offset: 1px; }
+  .lint-summary { margin: 1rem 0 0; font-family: var(--tt-font-mono); font-size: 0.82rem; color: var(--tt-muted); }
   h1 {
     margin: 0 0 0.75rem; font-size: 1.85rem; font-weight: 700;
     letter-spacing: -0.03em; color: var(--tt-blue); line-height: 1.2;
@@ -267,17 +301,29 @@ const SHARED_CSS = `
   footer a:hover { color: var(--tt-blue); }
 `;
 
+function navLink(
+  href: string,
+  label: string,
+  key: NavKey,
+  active?: NavKey,
+): string {
+  const current = active === key;
+  return `<a href="${href}"${current ? ' class="is-active" aria-current="page"' : ""}>${label}</a>`;
+}
+
 function layout(options: {
   title: string;
   description: string;
   canonical?: string;
   body: string;
   script?: string;
+  active?: NavKey;
 }): string {
   const canonical = options.canonical
     ? `<link rel="canonical" href="${options.canonical}" />`
     : "";
   const appScript = options.script ? `<script>${options.script}</script>` : "";
+  const active = options.active;
   return `<!DOCTYPE html>
 <html lang="en" data-theme="${THEME_DEFAULT}">
 <head>
@@ -296,12 +342,15 @@ function layout(options: {
         <img src="https://congtam.net/assets/mark-tile.svg" alt="" width="28" height="28" />
         <span>
           <span class="brand-name">eaglesheet</span>
-          <span class="brand-tag">Snowflake SQL scaffold</span>
+          <span class="brand-tag">Data toolkit</span>
         </span>
       </a>
       <nav class="nav" aria-label="Site">
-        <a href="/about">About</a>
-        <a href="/privacy">Privacy</a>
+        ${navLink("/", "Tools", "hub", active)}
+        ${navLink("/scaffold", "Scaffold", "scaffold", active)}
+        ${navLink("/lint", "Lint", "lint", active)}
+        ${navLink("/about", "About", "about", active)}
+        ${navLink("/privacy", "Privacy", "privacy", active)}
         ${THEME_TOGGLE}
       </nav>
     </header>
@@ -321,15 +370,43 @@ function layout(options: {
 </html>`;
 }
 
-function renderHome(): string {
+function renderHub(): string {
   return layout({
-    title: "eaglesheet — Snowflake SQL from a sample",
+    title: "eaglesheet — data toolkit",
     description:
-      "Paste a CSV or JSON sample and get CREATE TABLE, COPY INTO, and MERGE SQL for Snowflake. Everything runs in the browser.",
+      "Small in-browser tools for data work: Snowflake SQL scaffolding and an SQL linter.",
     canonical: "/",
-    script: CLIENT_SCRIPT,
+    active: "hub",
     body: `
       <h1>eaglesheet</h1>
+      <p class="privacy-banner">Everything runs in your browser. Nothing you paste is uploaded to eaglesheet.</p>
+      <p class="lede">A pocket toolkit for data engineers — scaffold Snowflake SQL from a sample, lint SQL for common footguns, more tools later.</p>
+
+      <h2>Tools</h2>
+      <ul class="tool-list">
+        <li>
+          <a class="tool-name" href="/scaffold">Scaffold</a>
+          <p>Paste CSV or JSON and get <span class="mono">CREATE TABLE</span>, load SQL, and a Type 1 <span class="mono">MERGE</span> for Snowflake.</p>
+        </li>
+        <li>
+          <a class="tool-name" href="/lint">Lint</a>
+          <p>Rule-based SQL checks for unbalanced syntax, missing WHERE, SELECT *, cartesian risk, and a few Snowflake nits.</p>
+        </li>
+      </ul>
+    `,
+  });
+}
+
+function renderScaffold(): string {
+  return layout({
+    title: "Scaffold — eaglesheet",
+    description:
+      "Paste a CSV or JSON sample and get CREATE TABLE, COPY INTO, and MERGE SQL for Snowflake. Everything runs in the browser.",
+    canonical: "/scaffold",
+    active: "scaffold",
+    script: CLIENT_SCRIPT,
+    body: `
+      <h1>Scaffold</h1>
       <p class="privacy-banner">Everything runs in your browser. The sample never leaves this page.</p>
       <p class="lede">Paste a few rows of real data and get production-ready Snowflake SQL — table DDL, load statements, and a Type 1 MERGE.</p>
 
@@ -401,17 +478,43 @@ function renderHome(): string {
   });
 }
 
+function renderLint(): string {
+  return layout({
+    title: "Lint — eaglesheet",
+    description:
+      "In-browser SQL linter for common data-engineering footguns, with Snowflake-oriented notes.",
+    canonical: "/lint",
+    active: "lint",
+    script: LINT_SCRIPT,
+    body: `
+      <h1>Lint</h1>
+      <p class="privacy-banner">SQL is checked in your browser. Nothing is sent to eaglesheet.</p>
+      <p class="lede">Rule-based hygiene checks — not a full parser. Useful before you paste into a worksheet.</p>
+
+      <label class="field-label" for="sql-input">SQL</label>
+      <textarea id="sql-input" spellcheck="false" placeholder="Paste a query or DML statement."></textarea>
+      <div class="sample-actions">
+        <button type="button" class="example-btn" id="load-lint-example">Load example</button>
+      </div>
+
+      <p id="lint-summary" class="lint-summary" hidden></p>
+      <div id="findings" class="findings" aria-live="polite"></div>
+      <p id="lint-empty" class="empty-state">Paste SQL above to run checks.</p>
+    `,
+  });
+}
+
 function renderAbout(): string {
   return layout({
     title: "About — eaglesheet",
-    description:
-      "About eaglesheet, a client-side Snowflake SQL scaffolding tool.",
+    description: "About eaglesheet, a small in-browser data toolkit.",
     canonical: "/about",
+    active: "about",
     body: `
       <h1>About</h1>
-      <p>eaglesheet turns a pasted CSV or JSON sample into Snowflake-ready <span class="mono">CREATE TABLE</span>, load, and <span class="mono">MERGE</span> SQL.</p>
-      <p>It is for data engineers who already know Snowflake. The point is removing twenty minutes of tedious typing, especially the upsert.</p>
-      <p>Part of the <a href="https://congtam.net">congtam.net</a> portfolio. No accounts, no saved state, no server-side processing of your sample. See <a href="/privacy">Privacy</a>.</p>
+      <p>eaglesheet is a pocket toolkit for data engineers: scaffold Snowflake SQL from a CSV or JSON sample, and lint SQL for common footguns.</p>
+      <p>It assumes you already know Snowflake. The point is removing tedious typing and catching obvious mistakes before a worksheet run.</p>
+      <p>Part of the <a href="https://congtam.net">congtam.net</a> portfolio. No accounts, no saved state, no server-side processing of your inputs. See <a href="/privacy">Privacy</a>.</p>
     `,
   });
 }
@@ -419,12 +522,13 @@ function renderAbout(): string {
 function renderPrivacy(): string {
   return layout({
     title: "Privacy — eaglesheet",
-    description: "Privacy for eaglesheet: samples stay in the browser.",
+    description: "Privacy for eaglesheet: samples and SQL stay in the browser.",
     canonical: "/privacy",
+    active: "privacy",
     body: `
       <h1>Privacy</h1>
-      <p>Parsing, type inference, and SQL generation run entirely in your browser. Pasted, uploaded, or URL-loaded samples are never posted to eaglesheet, logged, or stored.</p>
-      <p>Loading a public URL uses your browser to fetch the file directly. The Worker serves HTML and records a traffic datapoint (path, country, method, status). It does not see sample content.</p>
+      <p>Scaffolding and linting run entirely in your browser. Pasted, uploaded, or URL-loaded samples — and SQL you lint — are never posted to eaglesheet, logged, or stored.</p>
+      <p>Loading a public URL uses your browser to fetch the file directly. The Worker serves HTML and records a traffic datapoint (path, country, method, status). It does not see sample or SQL content.</p>
       <p>No accounts, cookies for tracking, or third-party analytics. See also the portfolio notes on <a href="https://congtam.net">congtam.net</a>.</p>
     `,
   });
@@ -436,7 +540,7 @@ function renderNotFound(): string {
     description: "Page not found.",
     body: `
       <h1>Not found</h1>
-      <p>No page at this URL. <a href="/">Back to eaglesheet</a>.</p>
+      <p>No page at this URL. <a href="/">Back to tools</a>.</p>
     `,
   });
 }
@@ -454,7 +558,13 @@ export function handleApp(
   }
 
   if (path === "/" || path === "/index.html") {
-    return html(renderHome(), context.requestId);
+    return html(renderHub(), context.requestId);
+  }
+  if (path === "/scaffold") {
+    return html(renderScaffold(), context.requestId);
+  }
+  if (path === "/lint") {
+    return html(renderLint(), context.requestId);
   }
   if (path === "/about") {
     return html(renderAbout(), context.requestId);

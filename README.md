@@ -1,7 +1,13 @@
 # eaglesheet
 
-Paste a CSV or JSON sample and get Snowflake `CREATE TABLE`, `COPY INTO`, and
-`MERGE` SQL. Everything runs in the browser — the sample never leaves the page.
+Small in-browser data tools for engineers: scaffold Snowflake SQL from a CSV or
+JSON sample, and lint SQL for common footguns. Inputs never leave the page.
+
+## Tools
+
+- `/` — toolkit hub
+- `/scaffold` — CSV/JSON → `CREATE TABLE`, load SQL, `MERGE`
+- `/lint` — rule-based SQL hygiene checks
 
 ## Setup
 

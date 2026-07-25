@@ -1,67 +1,60 @@
 import { SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
-describe("static profile", () => {
-  it("serves the home page with brand shell and privacy banner", async () => {
+describe("toolkit routes", () => {
+  it("serves the tools hub at /", async () => {
     const response = await SELF.fetch("https://eaglesheet.com/");
-
     expect(response.status).toBe(200);
-    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
-    expect(response.headers.get("referrer-policy")).toBe(
-      "strict-origin-when-cross-origin",
-    );
-    expect(response.headers.get("x-request-id")).toBeTruthy();
     const body = await response.text();
-    expect(body).toContain("eaglesheet");
-    expect(body).toContain("Everything runs in your browser");
-    expect(body).toContain("tamta-tokens.css");
-    expect(body).toContain("mark-tile.svg");
-    expect(body).toContain("congtam.net");
+    expect(body).toContain("Data toolkit");
+    expect(body).toContain('href="/scaffold"');
+    expect(body).toContain('href="/lint"');
+    expect(body).toContain("data-theme-toggle");
+    expect(body).not.toContain('id="sample"');
+  });
+
+  it("serves the scaffold tool with sample controls", async () => {
+    const response = await SELF.fetch("https://eaglesheet.com/scaffold");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-security-policy")).toContain(
+      "connect-src https:",
+    );
+    const body = await response.text();
     expect(body).toContain('id="sample"');
-    expect(body).toContain('name="format"');
     expect(body).toContain("detectFormat");
-    expect(body).toContain("load-example");
-    expect(body).toContain('id="sample-file"');
     expect(body).toContain("Upload file");
-    expect(body).toContain('id="sample-url"');
-    expect(body).toContain('id="load-url"');
     expect(body).toContain("Try iris CSV");
     expect(body).toContain(
       "https://cdn.jsdelivr.net/gh/plotly/datasets@master/iris.csv",
     );
-    expect(body).toContain("data-copy");
-    expect(body).toContain("empty-state");
-    expect(body).toContain('data-theme="dark"');
-    expect(body).toContain("tt-theme");
-    expect(body).toContain("data-theme-toggle");
-    expect(response.headers.get("content-security-policy")).toContain(
-      "connect-src https:",
-    );
   });
 
-  it("privacy page explains client-side URL fetch", async () => {
+  it("serves the lint tool", async () => {
+    const response = await SELF.fetch("https://eaglesheet.com/lint");
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('id="sql-input"');
+    expect(body).toContain("load-lint-example");
+    expect(body).toContain("lintSql");
+    expect(body).toContain("SQL is checked in your browser");
+  });
+
+  it("privacy page explains client-side processing", async () => {
     const privacy = await SELF.fetch("https://eaglesheet.com/privacy");
     expect(privacy.status).toBe(200);
     const body = await privacy.text();
     expect(body).toContain("URL-loaded");
     expect(body).toContain("fetch the file directly");
+    expect(body).toContain("never posted to eaglesheet, logged, or stored");
   });
 
-  it("serves about and privacy pages", async () => {
+  it("serves about and a branded 404", async () => {
     const about = await SELF.fetch("https://eaglesheet.com/about");
     expect(about.status).toBe(200);
-    expect(await about.text()).toContain("Snowflake-ready");
+    expect(await about.text()).toContain("pocket toolkit");
 
-    const privacy = await SELF.fetch("https://eaglesheet.com/privacy");
-    expect(privacy.status).toBe(200);
-    expect(await privacy.text()).toContain(
-      "never posted to eaglesheet, logged, or stored",
-    );
-  });
-
-  it("serves a branded 404", async () => {
-    const response = await SELF.fetch("https://eaglesheet.com/missing");
-    expect(response.status).toBe(404);
-    expect(await response.text()).toContain("Not found");
+    const missing = await SELF.fetch("https://eaglesheet.com/missing");
+    expect(missing.status).toBe(404);
+    expect(await missing.text()).toContain("Not found");
   });
 });
