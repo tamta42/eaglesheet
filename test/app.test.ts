@@ -25,6 +25,9 @@ describe("static profile", () => {
     expect(body).toContain("Upload file");
     expect(body).toContain("data-copy");
     expect(body).toContain("empty-state");
+    expect(body).toContain('data-theme="dark"');
+    expect(body).toContain("tt-theme");
+    expect(body).toContain("data-theme-toggle");
   });
 
   it("serves about and privacy pages", async () => {

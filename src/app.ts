@@ -2,19 +2,88 @@ import { CLIENT_SCRIPT } from "./client-script";
 import { html, methodNotAllowed } from "./http";
 import type { AppContext } from "./platform";
 
+const THEME_DEFAULT = "dark";
+
+const THEME_BOOT = `
+  <meta name="color-scheme" content="dark light" />
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("tt-theme");
+        if (t !== "light" && t !== "dark") t = "${THEME_DEFAULT}";
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "${THEME_DEFAULT}");
+      }
+    })();
+  </script>
+`;
+
+const THEME_TOGGLE = `<button type="button" class="theme-toggle" data-theme-toggle aria-label="Switch to light theme"><span class="theme-toggle-label" data-theme-label>Light</span></button>`;
+
+const THEME_JS = `
+(function () {
+  var root = document.documentElement;
+  var storageKey = "tt-theme";
+  function currentTheme() {
+    return root.getAttribute("data-theme") === "light" ? "light" : "dark";
+  }
+  function labelFor(theme) { return theme === "dark" ? "Light" : "Dark"; }
+  function ariaFor(theme) {
+    return theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
+  }
+  function apply(theme) {
+    root.setAttribute("data-theme", theme);
+    try { localStorage.setItem(storageKey, theme); } catch (e) {}
+    document.querySelectorAll("[data-theme-toggle]").forEach(function (btn) {
+      btn.setAttribute("aria-label", ariaFor(theme));
+      var label = btn.querySelector("[data-theme-label]");
+      if (label) label.textContent = labelFor(theme);
+    });
+  }
+  document.querySelectorAll("[data-theme-toggle]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      apply(currentTheme() === "dark" ? "light" : "dark");
+    });
+  });
+  apply(currentTheme());
+})();
+`;
+
 const BRAND_HEAD = `
+  ${THEME_BOOT}
   <link rel="stylesheet" href="https://congtam.net/assets/tamta-tokens.css">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="icon" href="https://congtam.net/assets/mark-tile.svg">
 `;
 
 const SHARED_CSS = `
+  html { color-scheme: light; }
+  html[data-theme="dark"] { color-scheme: dark; }
+  [data-theme="dark"] {
+    --tt-paper: #152538;
+    --tt-ink: #FBFAF7;
+    --tt-line: #2f4a6b;
+    --tt-muted: #9aabbf;
+    --tt-blue: #E8D9BC;
+    --tt-slate: #9AABBF;
+  }
+  :root { --tt-surface: color-mix(in srgb, var(--tt-ink) 4%, var(--tt-paper)); }
   *, *::before, *::after { box-sizing: border-box; }
   html, body {
     margin: 0; min-height: 100%;
     background: var(--tt-paper); color: var(--tt-ink);
     font-family: var(--tt-font-display);
   }
+  .theme-toggle {
+    appearance: none; margin: 0; padding: 0.4rem 0.7rem;
+    border: 1px solid var(--tt-line); border-radius: var(--tt-radius);
+    background: transparent; color: var(--tt-muted);
+    font-family: var(--tt-font-mono); font-size: 0.7rem; font-weight: 500;
+    letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer;
+  }
+  .theme-toggle:hover { color: var(--tt-blue); border-color: var(--tt-blue); }
+  .theme-toggle:focus-visible { outline: 2px solid var(--tt-clay); outline-offset: 2px; }
   a { color: var(--tt-blue); text-decoration: none; }
   a:hover { color: var(--tt-clay); }
   .shell { min-height: 100vh; display: flex; flex-direction: column; }
@@ -79,7 +148,7 @@ const SHARED_CSS = `
   #sample {
     width: 100%; min-height: 12rem; resize: vertical;
     padding: 0.85rem 1rem; border: 1px solid var(--tt-line);
-    border-radius: var(--tt-radius); background: #fff;
+    border-radius: var(--tt-radius); background: var(--tt-surface);
     color: var(--tt-ink); font-family: var(--tt-font-mono); font-size: 0.85rem;
     line-height: 1.45;
   }
@@ -111,7 +180,7 @@ const SHARED_CSS = `
     width: min(100%, 20rem); padding: 0.55rem 0.75rem;
     border: 1px solid var(--tt-line); border-radius: var(--tt-radius);
     font-family: var(--tt-font-mono); font-size: 0.9rem; color: var(--tt-ink);
-    background: #fff;
+    background: var(--tt-surface);
   }
   #table-name:focus { outline: 2px solid var(--tt-blue); outline-offset: 1px; }
   .error {
@@ -129,7 +198,7 @@ const SHARED_CSS = `
   .column-row select {
     font-family: var(--tt-font-mono); font-size: 0.82rem;
     padding: 0.35rem 0.5rem; border: 1px solid var(--tt-line);
-    border-radius: var(--tt-radius); background: #fff; color: var(--tt-ink);
+    border-radius: var(--tt-radius); background: var(--tt-surface); color: var(--tt-ink);
   }
   .key-list {
     display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-top: 0.5rem;
@@ -151,7 +220,7 @@ const SHARED_CSS = `
   }
   .output-head h2 { margin: 0; }
   .copy-btn {
-    appearance: none; border: 1px solid var(--tt-line); background: #fff;
+    appearance: none; border: 1px solid var(--tt-line); background: var(--tt-surface);
     color: var(--tt-muted); font-family: var(--tt-font-display); font-size: 0.8rem;
     padding: 0.3rem 0.65rem; border-radius: var(--tt-radius); cursor: pointer;
   }
@@ -160,7 +229,7 @@ const SHARED_CSS = `
   .output-block pre {
     margin: 0; padding: 0.9rem 1rem; overflow: auto;
     border: 1px solid var(--tt-line); border-radius: var(--tt-radius);
-    background: color-mix(in srgb, var(--tt-blue) 6%, #fff);
+    background: color-mix(in srgb, var(--tt-blue) 8%, var(--tt-paper));
     font-family: var(--tt-font-mono); font-size: 0.82rem; line-height: 1.45;
     color: var(--tt-ink); white-space: pre; min-height: 3rem;
   }
@@ -196,9 +265,9 @@ function layout(options: {
   const canonical = options.canonical
     ? `<link rel="canonical" href="${options.canonical}" />`
     : "";
-  const script = options.script ? `<script>${options.script}</script>` : "";
+  const appScript = options.script ? `<script>${options.script}</script>` : "";
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="${THEME_DEFAULT}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -221,6 +290,7 @@ function layout(options: {
       <nav class="nav" aria-label="Site">
         <a href="/about">About</a>
         <a href="/privacy">Privacy</a>
+        ${THEME_TOGGLE}
       </nav>
     </header>
     <main class="page">
@@ -233,7 +303,8 @@ function layout(options: {
       </footer>
     </main>
   </div>
-  ${script}
+  ${appScript}
+  <script>${THEME_JS}</script>
 </body>
 </html>`;
 }
