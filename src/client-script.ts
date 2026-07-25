@@ -331,10 +331,19 @@ export const CLIENT_SCRIPT = `
   var createSqlEl = document.getElementById("create-sql");
   var loadSqlEl = document.getElementById("load-sql");
   var mergeSqlEl = document.getElementById("merge-sql");
+  var emptyState = document.getElementById("empty-state");
+  var outputs = document.getElementById("outputs");
+  var loadExampleBtn = document.getElementById("load-example");
   var userPickedFormat = false;
   var columnState = [];
   var keyNames = [];
   var debounceTimer = null;
+
+  var WORKED_EXAMPLE = [
+    "order_id,customer_name,order_total,is_priority,ordered_at",
+    "1001,Acme Corp,1234567890.12,true,2024-01-15 10:30:00",
+    "1002,Beta Ltd,45.00,false,2024-01-16T14:22:01"
+  ].join("\\n");
 
   function selectedFormat() {
     for (var i = 0; i < formatInputs.length; i++) {
@@ -433,16 +442,23 @@ export const CLIENT_SCRIPT = `
     });
   }
 
+  function setOutputVisibility(hasOutput) {
+    outputs.hidden = !hasOutput;
+    emptyState.hidden = hasOutput || Boolean(sample.value.trim());
+  }
+
   function renderOutputs() {
     if (!columnState.length) {
       createSqlEl.textContent = "";
       loadSqlEl.textContent = "";
       mergeSqlEl.textContent = "";
+      setOutputVisibility(false);
       return;
     }
     createSqlEl.textContent = generateCreateTableSql(tableNameInput.value, columnState);
     loadSqlEl.textContent = generateLoadSql(tableNameInput.value, columnState, selectedFormat());
     mergeSqlEl.textContent = generateMergeSql(tableNameInput.value, columnState, keyNames);
+    setOutputVisibility(true);
   }
 
   function regenerate() {
@@ -464,6 +480,7 @@ export const CLIENT_SCRIPT = `
       createSqlEl.textContent = "";
       loadSqlEl.textContent = "";
       mergeSqlEl.textContent = "";
+      setOutputVisibility(false);
       errorEl.hidden = false;
       errorEl.textContent = parsed.error;
       return;
@@ -505,6 +522,30 @@ export const CLIENT_SCRIPT = `
 
   sample.addEventListener("input", onSampleInput);
   tableNameInput.addEventListener("input", scheduleRegenerate);
+  loadExampleBtn.addEventListener("click", function () {
+    userPickedFormat = false;
+    tableNameInput.value = "MY_TABLE";
+    sample.value = WORKED_EXAMPLE;
+    setFormat("csv", true);
+    regenerate();
+  });
+  document.querySelectorAll("[data-copy]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var targetId = button.getAttribute("data-copy");
+      var target = document.getElementById(targetId);
+      var text = target ? target.textContent || "" : "";
+      if (!text) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          button.textContent = "Copied";
+          setTimeout(function () { button.textContent = "Copy"; }, 1200);
+        }).catch(function () {
+          button.textContent = "Copy failed";
+          setTimeout(function () { button.textContent = "Copy"; }, 1200);
+        });
+      }
+    });
+  });
   setFormat(detectFormat(sample.value), true);
   regenerate();
 })();

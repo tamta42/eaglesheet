@@ -125,13 +125,38 @@ const SHARED_CSS = `
   }
   .outputs { margin-top: 2rem; }
   .output-block { margin-top: 1.25rem; }
+  .output-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 0.75rem; margin-bottom: 0.5rem;
+  }
+  .output-head h2 { margin: 0; }
+  .copy-btn {
+    appearance: none; border: 1px solid var(--tt-line); background: #fff;
+    color: var(--tt-muted); font-family: var(--tt-font-display); font-size: 0.8rem;
+    padding: 0.3rem 0.65rem; border-radius: var(--tt-radius); cursor: pointer;
+  }
+  .copy-btn:hover { color: var(--tt-blue); border-color: var(--tt-blue); }
+  .copy-btn:focus-visible { outline: 2px solid var(--tt-clay); outline-offset: 2px; }
   .output-block pre {
     margin: 0; padding: 0.9rem 1rem; overflow: auto;
     border: 1px solid var(--tt-line); border-radius: var(--tt-radius);
     background: color-mix(in srgb, var(--tt-blue) 6%, #fff);
     font-family: var(--tt-font-mono); font-size: 0.82rem; line-height: 1.45;
-    color: var(--tt-ink); white-space: pre;
+    color: var(--tt-ink); white-space: pre; min-height: 3rem;
   }
+  .empty-state {
+    margin: 1.5rem 0 0; padding: 1rem 1.1rem;
+    border: 1px dashed var(--tt-line); border-radius: var(--tt-radius);
+    color: var(--tt-muted); font-size: 0.95rem;
+  }
+  .example-btn {
+    appearance: none; border: none; background: transparent;
+    color: var(--tt-blue); font-family: var(--tt-font-display); font-size: inherit;
+    padding: 0; cursor: pointer; text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+  .example-btn:hover { color: var(--tt-clay); }
+  .example-btn:focus-visible { outline: 2px solid var(--tt-clay); outline-offset: 2px; }
   footer {
     margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--tt-line);
     display: flex; align-items: center; gap: 0.45rem; font-size: 0.85rem;
@@ -214,6 +239,9 @@ function renderHome(): string {
         <p id="format-hint"></p>
       </div>
       <textarea id="sample" name="sample" spellcheck="false" placeholder="Paste a CSV header plus a few rows, or a JSON object / array."></textarea>
+      <p style="margin:0.55rem 0 0;font-size:0.9rem;color:var(--tt-muted)">
+        <button type="button" class="example-btn" id="load-example">Load worked example</button>
+      </p>
 
       <div class="table-name-row">
         <label class="field-label" for="table-name">Table name</label>
@@ -224,17 +252,28 @@ function renderHome(): string {
       <div id="column-mapping" hidden></div>
       <div id="key-columns" hidden></div>
 
-      <section class="outputs" aria-live="polite">
+      <p id="empty-state" class="empty-state">Paste a sample above, or load the worked example, to generate Snowflake SQL.</p>
+
+      <section class="outputs" id="outputs" hidden aria-live="polite">
         <div class="output-block">
-          <h2>CREATE TABLE</h2>
+          <div class="output-head">
+            <h2>CREATE TABLE</h2>
+            <button type="button" class="copy-btn" data-copy="create-sql">Copy</button>
+          </div>
           <pre id="create-sql"></pre>
         </div>
         <div class="output-block">
-          <h2>FILE FORMAT and COPY INTO</h2>
+          <div class="output-head">
+            <h2>FILE FORMAT and COPY INTO</h2>
+            <button type="button" class="copy-btn" data-copy="load-sql">Copy</button>
+          </div>
           <pre id="load-sql"></pre>
         </div>
         <div class="output-block">
-          <h2>MERGE</h2>
+          <div class="output-head">
+            <h2>MERGE</h2>
+            <button type="button" class="copy-btn" data-copy="merge-sql">Copy</button>
+          </div>
           <pre id="merge-sql"></pre>
         </div>
       </section>

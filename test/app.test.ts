@@ -20,6 +20,9 @@ describe("static profile", () => {
     expect(body).toContain('id="sample"');
     expect(body).toContain('name="format"');
     expect(body).toContain("detectFormat");
+    expect(body).toContain("load-example");
+    expect(body).toContain("data-copy");
+    expect(body).toContain("empty-state");
   });
 
   it("serves about and privacy pages", async () => {
