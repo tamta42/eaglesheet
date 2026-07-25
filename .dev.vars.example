@@ -1,0 +1,6 @@
+# Copy only for non-sensitive local configuration.
+# Secrets Store bindings are intentionally created with Wrangler instead:
+# npx wrangler secrets-store store create local-dev
+# npx wrangler secrets-store secret create <STORE_ID> --name <SECRET_NAME> --scopes workers
+#
+# Never use production secret values locally. See README.md.

@@ -1,0 +1,17 @@
+---
+description: Cloudflare-first engineering and safe template feedback
+alwaysApply: true
+---
+
+# Cloudflare-first
+
+- Check current Cloudflare documentation before changing bindings, Wrangler config, or runtime APIs.
+- Evaluate a native Cloudflare capability first, but document and use a non-Cloudflare option when
+  requirements, reliability, portability, compliance, or cost evidence makes it better.
+- Keep `wrangler.jsonc`, generated binding types, migrations, tests, and runtime usage aligned.
+- Never add real account IDs, resource IDs, domains, sender identities, secrets, OTPs, or user data.
+- Treat https://congtam.net/brandguide as the brand source of truth; do not duplicate its content.
+- Add only services the app needs. Treat rate limits as abuse friction, not exact accounting.
+- Log privacy-safe event metadata and request IDs, never payloads, credentials, or identity data.
+- Changes learned from this app do not silently sync to the template. Submit an evidence-backed
+  proposal with reproduction, current docs, tests, migration guidance, and human review.

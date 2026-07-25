@@ -1,0 +1,40 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "eaglesheet",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 0.1,
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.05,
+    },
+  },
+  "limits": {
+    "cpu_ms": 100,
+  },
+  "vars": {
+    "APP_NAME": "eaglesheet",
+    "APP_DOMAIN": "eaglesheet.com",
+    "PROFILE": "static",
+    "AUTH_ENABLED": "false",
+  },
+  // Custom domain, not a zone route — Cloudflare owns DNS and TLS.
+  "routes": [
+    {
+      "pattern": "eaglesheet.com",
+      "custom_domain": true,
+    },
+  ],
+  "analytics_engine_datasets": [
+    {
+      "binding": "TRAFFIC",
+      "dataset": "eaglesheet_traffic",
+    },
+  ],
+}

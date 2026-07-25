@@ -1,0 +1,8 @@
+{
+  "template": "vibecode-template",
+  "templateVersion": "1.0.0",
+  "generatedAtCompatibilityDate": "2026-07-15",
+  "profile": "static",
+  "auth": false,
+  "services": []
+}
