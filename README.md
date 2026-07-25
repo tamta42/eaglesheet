@@ -1,7 +1,7 @@
 # eaglesheet
 
 Small in-browser data tools for engineers: scaffold Snowflake SQL from a CSV or
-JSON sample, lint SQL for common footguns, and format messy SQL. Inputs never
+JSON sample, lint and format SQL, and normalise messy column names. Inputs never
 leave the page.
 
 ## Tools
@@ -10,6 +10,7 @@ leave the page.
 - `/scaffold` — CSV/JSON → `CREATE TABLE`, load SQL, `MERGE`
 - `/lint` — rule-based SQL hygiene checks
 - `/format` — pragmatic SQL formatter (clause breaks, keyword case)
+- `/names` — headers → Snowflake-safe `SNAKE_CASE` + rename / `AS` map
 
 ## Setup
 

@@ -2,9 +2,11 @@ import { CLIENT_SCRIPT } from "./client-script";
 import { FORMAT_SCRIPT } from "./format-script";
 import { html, methodNotAllowed } from "./http";
 import { LINT_SCRIPT } from "./lint-script";
+import { NAMES_SCRIPT } from "./names-script";
 import type { AppContext } from "./platform";
 
-type NavKey = "hub" | "scaffold" | "lint" | "format" | "about" | "privacy";
+type NavKey =
+  "hub" | "scaffold" | "lint" | "format" | "names" | "about" | "privacy";
 
 const THEME_DEFAULT = "dark";
 
@@ -130,21 +132,25 @@ const SHARED_CSS = `
     text-transform: uppercase; color: var(--tt-muted); margin: 0 0 0.25rem;
   }
   .finding-msg { margin: 0; color: var(--tt-ink); }
-  #sql-input, #format-input {
+  #sql-input, #format-input, #names-input {
     width: 100%; min-height: 14rem; resize: vertical;
     padding: 0.85rem 1rem; border: 1px solid var(--tt-line);
     border-radius: var(--tt-radius); background: var(--tt-surface);
     color: var(--tt-ink); font-family: var(--tt-font-mono); font-size: 0.85rem;
     line-height: 1.45;
   }
-  #sql-input:focus, #format-input:focus { outline: 2px solid var(--tt-blue); outline-offset: 1px; }
-  #format-output {
-    margin: 0; min-height: 8rem; padding: 0.85rem 1rem;
+  #sql-input:focus, #format-input:focus, #names-input:focus {
+    outline: 2px solid var(--tt-blue); outline-offset: 1px;
+  }
+  #format-output, #names-identifiers, #names-rename-map, #names-select-list {
+    margin: 0; min-height: 6rem; padding: 0.85rem 1rem;
     border: 1px solid var(--tt-line); border-radius: var(--tt-radius);
     background: var(--tt-surface); color: var(--tt-ink);
     font-family: var(--tt-font-mono); font-size: 0.85rem; line-height: 1.45;
     white-space: pre-wrap; overflow-x: auto;
   }
+  .names-summary { margin: 1rem 0 0; font-family: var(--tt-font-mono); font-size: 0.82rem; color: var(--tt-muted); }
+
   .option-row {
     display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem;
     margin: 0.75rem 0 0;
@@ -366,6 +372,7 @@ function layout(options: {
         ${navLink("/scaffold", "Scaffold", "scaffold", active)}
         ${navLink("/lint", "Lint", "lint", active)}
         ${navLink("/format", "Format", "format", active)}
+        ${navLink("/names", "Names", "names", active)}
         ${navLink("/about", "About", "about", active)}
         ${navLink("/privacy", "Privacy", "privacy", active)}
         ${THEME_TOGGLE}
@@ -391,13 +398,13 @@ function renderHub(): string {
   return layout({
     title: "eaglesheet — data toolkit",
     description:
-      "Small in-browser tools for data work: Snowflake SQL scaffolding, linting, and formatting.",
+      "Small in-browser tools for data work: Snowflake SQL scaffolding, linting, formatting, and identifier cleanup.",
     canonical: "/",
     active: "hub",
     body: `
       <h1>eaglesheet</h1>
       <p class="privacy-banner">Everything runs in your browser. Nothing you paste is uploaded to eaglesheet.</p>
-      <p class="lede">A pocket toolkit for data engineers — scaffold Snowflake SQL from a sample, lint and format SQL, more tools later.</p>
+      <p class="lede">A pocket toolkit for data engineers — scaffold, lint, format, and clean identifiers for Snowflake.</p>
 
       <h2>Tools</h2>
       <ul class="tool-list">
@@ -412,6 +419,10 @@ function renderHub(): string {
         <li>
           <a class="tool-name" href="/format">Format</a>
           <p>Paste messy SQL and get readable warehouse-style formatting — clause breaks, keyword case, preserved strings.</p>
+        </li>
+        <li>
+          <a class="tool-name" href="/names">Names</a>
+          <p>Messy headers → Snowflake-safe <span class="mono">SNAKE_CASE</span>, a rename map, and a quoted <span class="mono">AS</span> select list.</p>
         </li>
       </ul>
     `,
@@ -557,6 +568,62 @@ function renderFormat(): string {
   });
 }
 
+function renderNames(): string {
+  return layout({
+    title: "Names — eaglesheet",
+    description:
+      "Turn messy column headers into Snowflake-safe SNAKE_CASE identifiers, with a rename map and AS select list.",
+    canonical: "/names",
+    active: "names",
+    script: NAMES_SCRIPT,
+    body: `
+      <h1>Names</h1>
+      <p class="privacy-banner">Headers are normalised in your browser. Nothing is sent to eaglesheet.</p>
+      <p class="lede">Paste a CSV header line or one name per line. Get warehouse-safe identifiers — same rules Scaffold uses — plus a rename map you can drop into a select list.</p>
+
+      <label class="field-label" for="names-input">Headers</label>
+      <div class="format-row">
+        <div class="format-toggle" role="group" aria-label="Input shape">
+          <label><input type="radio" name="names-mode" value="auto" checked /> Auto</label>
+          <label><input type="radio" name="names-mode" value="csv" /> CSV header</label>
+          <label><input type="radio" name="names-mode" value="lines" /> One per line</label>
+        </div>
+      </div>
+      <textarea id="names-input" spellcheck="false" placeholder="Order Id,Customer Name,Total $&#10;or one name per line"></textarea>
+      <div class="sample-actions">
+        <button type="button" class="example-btn" id="load-names-example">Load example</button>
+      </div>
+
+      <p id="names-summary" class="names-summary" hidden></p>
+      <p id="names-empty" class="empty-state">Paste headers above to normalise them.</p>
+
+      <section class="outputs" id="names-outputs" hidden aria-live="polite">
+        <div class="output-block">
+          <div class="output-head">
+            <h2>Identifiers</h2>
+            <button type="button" class="copy-btn" data-copy="names-identifiers">Copy</button>
+          </div>
+          <pre id="names-identifiers"></pre>
+        </div>
+        <div class="output-block">
+          <div class="output-head">
+            <h2>Rename map</h2>
+            <button type="button" class="copy-btn" data-copy="names-rename-map">Copy</button>
+          </div>
+          <pre id="names-rename-map"></pre>
+        </div>
+        <div class="output-block">
+          <div class="output-head">
+            <h2>SELECT list (AS)</h2>
+            <button type="button" class="copy-btn" data-copy="names-select-list">Copy</button>
+          </div>
+          <pre id="names-select-list"></pre>
+        </div>
+      </section>
+    `,
+  });
+}
+
 function renderAbout(): string {
   return layout({
     title: "About — eaglesheet",
@@ -565,7 +632,7 @@ function renderAbout(): string {
     active: "about",
     body: `
       <h1>About</h1>
-      <p>eaglesheet is a pocket toolkit for data engineers: scaffold Snowflake SQL from a CSV or JSON sample, lint SQL for common footguns, and format messy SQL for readability.</p>
+      <p>eaglesheet is a pocket toolkit for data engineers: scaffold Snowflake SQL from a CSV or JSON sample, lint and format SQL, and normalise messy column names.</p>
       <p>It assumes you already know Snowflake. The point is removing tedious typing and catching obvious mistakes before a worksheet run.</p>
       <p>Part of the <a href="https://congtam.net">congtam.net</a> portfolio. No accounts, no saved state, no server-side processing of your inputs. See <a href="/privacy">Privacy</a>.</p>
     `,
@@ -580,7 +647,7 @@ function renderPrivacy(): string {
     active: "privacy",
     body: `
       <h1>Privacy</h1>
-      <p>Scaffolding, linting, and formatting run entirely in your browser. Pasted, uploaded, or URL-loaded samples — and SQL you lint or format — are never posted to eaglesheet, logged, or stored.</p>
+      <p>Scaffolding, linting, formatting, and name normalisation run entirely in your browser. Pasted samples, headers, and SQL are never posted to eaglesheet, logged, or stored.</p>
       <p>Loading a public URL uses your browser to fetch the file directly. The Worker serves HTML and records a traffic datapoint (path, country, method, status). It does not see sample or SQL content.</p>
       <p>No accounts, cookies for tracking, or third-party analytics. See also the portfolio notes on <a href="https://congtam.net">congtam.net</a>.</p>
     `,
@@ -621,6 +688,9 @@ export function handleApp(
   }
   if (path === "/format") {
     return html(renderFormat(), context.requestId);
+  }
+  if (path === "/names") {
+    return html(renderNames(), context.requestId);
   }
   if (path === "/about") {
     return html(renderAbout(), context.requestId);

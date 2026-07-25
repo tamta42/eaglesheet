@@ -10,6 +10,7 @@ describe("toolkit routes", () => {
     expect(body).toContain('href="/scaffold"');
     expect(body).toContain('href="/lint"');
     expect(body).toContain('href="/format"');
+    expect(body).toContain('href="/names"');
     expect(body).toContain("data-theme-toggle");
     expect(body).not.toContain('id="sample"');
   });
@@ -51,13 +52,24 @@ describe("toolkit routes", () => {
     expect(body).toContain("uppercase-keywords");
   });
 
+  it("serves the names tool", async () => {
+    const response = await SELF.fetch("https://eaglesheet.com/names");
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('id="names-input"');
+    expect(body).toContain("load-names-example");
+    expect(body).toContain("normaliseNames");
+    expect(body).toContain("Headers are normalised in your browser");
+    expect(body).toContain("names-select-list");
+  });
+
   it("privacy page explains client-side processing", async () => {
     const privacy = await SELF.fetch("https://eaglesheet.com/privacy");
     expect(privacy.status).toBe(200);
     const body = await privacy.text();
-    expect(body).toContain("URL-loaded");
     expect(body).toContain("fetch the file directly");
     expect(body).toContain("never posted to eaglesheet, logged, or stored");
+    expect(body).toContain("name normalisation");
   });
 
   it("serves about and a branded 404", async () => {
