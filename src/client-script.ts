@@ -183,16 +183,57 @@ export const CLIENT_SCRIPT = `
     ].join("\\n");
   }
 
+  function defaultKeyColumnNames(columns) {
+    for (var i = 0; i < columns.length; i++) {
+      if (columns[i].name.slice(-3) === "_ID") return [columns[i].name];
+    }
+    return columns[0] ? [columns[0].name] : [];
+  }
+
+  function generateMergeSql(tableNameRaw, columns, keyNames) {
+    var tableName = normalizeHeaderNames([tableNameRaw || "MY_TABLE"]).names[0];
+    var staging = tableName + "_STAGING";
+    var keys = columns.filter(function (column) { return keyNames.indexOf(column.name) !== -1; });
+    var nonKeys = columns.filter(function (column) { return keyNames.indexOf(column.name) === -1; });
+    if (!columns.length || !keys.length) return "";
+    var onClause = keys.map(function (column) {
+      return "t." + column.name + " = s." + column.name;
+    }).join(" AND ");
+    var lines = [
+      "MERGE INTO " + tableName + " AS t",
+      "USING " + staging + " AS s",
+      "  ON " + onClause
+    ];
+    if (nonKeys.length) {
+      var nameWidth = 0;
+      nonKeys.forEach(function (column) { nameWidth = Math.max(nameWidth, column.name.length); });
+      var updates = nonKeys.map(function (column) {
+        return "  t." + column.name + " ".repeat(nameWidth - column.name.length) + " = s." + column.name;
+      });
+      lines.push("WHEN MATCHED THEN UPDATE SET");
+      lines.push(updates.join(",\\n"));
+    }
+    lines.push("WHEN NOT MATCHED THEN INSERT (");
+    lines.push("  " + columns.map(function (c) { return c.name; }).join(", "));
+    lines.push(") VALUES (");
+    lines.push("  " + columns.map(function (c) { return "s." + c.name; }).join(", "));
+    lines.push(");");
+    return lines.join("\\n");
+  }
+
   var sample = document.getElementById("sample");
   var tableNameInput = document.getElementById("table-name");
   var formatInputs = document.querySelectorAll('input[name="format"]');
   var formatHint = document.getElementById("format-hint");
   var errorEl = document.getElementById("parse-error");
   var mappingEl = document.getElementById("column-mapping");
+  var keysEl = document.getElementById("key-columns");
   var createSqlEl = document.getElementById("create-sql");
   var loadSqlEl = document.getElementById("load-sql");
+  var mergeSqlEl = document.getElementById("merge-sql");
   var userPickedFormat = false;
   var columnState = [];
+  var keyNames = [];
   var debounceTimer = null;
 
   function selectedFormat() {
@@ -226,6 +267,8 @@ export const CLIENT_SCRIPT = `
     if (!columns.length) {
       mappingEl.innerHTML = "";
       mappingEl.hidden = true;
+      keysEl.innerHTML = "";
+      keysEl.hidden = true;
       return;
     }
     mappingEl.hidden = false;
@@ -257,6 +300,31 @@ export const CLIENT_SCRIPT = `
         renderOutputs();
       });
     });
+
+    keysEl.hidden = false;
+    var keyHtml = '<h2>MERGE keys</h2><div class="key-list">';
+    columns.forEach(function (column) {
+      var checked = keyNames.indexOf(column.name) !== -1 ? " checked" : "";
+      keyHtml += '<label class="key-option"><input type="checkbox" data-key="' +
+        escapeHtml(column.name) + '"' + checked + ' /> <span class="mono">' +
+        escapeHtml(column.name) + '</span></label>';
+    });
+    keyHtml += '</div>';
+    keysEl.innerHTML = keyHtml;
+    keysEl.querySelectorAll('input[type="checkbox"]').forEach(function (box) {
+      box.addEventListener("change", function () {
+        keyNames = [];
+        keysEl.querySelectorAll('input[type="checkbox"]').forEach(function (item) {
+          if (item.checked) keyNames.push(item.getAttribute("data-key"));
+        });
+        if (!keyNames.length && columnState[0]) {
+          keyNames = [columnState[0].name];
+          renderMapping(columnState);
+          return;
+        }
+        renderOutputs();
+      });
+    });
   }
 
   function escapeHtml(value) {
@@ -269,10 +337,12 @@ export const CLIENT_SCRIPT = `
     if (!columnState.length) {
       createSqlEl.textContent = "";
       loadSqlEl.textContent = "";
+      mergeSqlEl.textContent = "";
       return;
     }
     createSqlEl.textContent = generateCreateTableSql(tableNameInput.value, columnState);
     loadSqlEl.textContent = generateCsvLoadSql(tableNameInput.value);
+    mergeSqlEl.textContent = generateMergeSql(tableNameInput.value, columnState, keyNames);
   }
 
   function regenerate() {
@@ -281,15 +351,18 @@ export const CLIENT_SCRIPT = `
     errorEl.textContent = "";
     if (!sample.value.trim()) {
       columnState = [];
+      keyNames = [];
       renderMapping([]);
       renderOutputs();
       return;
     }
     if (format !== "csv") {
       columnState = [];
+      keyNames = [];
       renderMapping([]);
       createSqlEl.textContent = "";
       loadSqlEl.textContent = "";
+      mergeSqlEl.textContent = "";
       errorEl.hidden = false;
       errorEl.textContent = "JSON support lands in a later commit. Switch to CSV for now.";
       return;
@@ -297,21 +370,28 @@ export const CLIENT_SCRIPT = `
     var parsed = parseCsv(sample.value);
     if (parsed.error) {
       columnState = [];
+      keyNames = [];
       renderMapping([]);
       createSqlEl.textContent = "";
       loadSqlEl.textContent = "";
+      mergeSqlEl.textContent = "";
       errorEl.hidden = false;
       errorEl.textContent = parsed.error;
       return;
     }
     var previousTypes = {};
     columnState.forEach(function (column) { previousTypes[column.name] = column.type; });
+    var previousKeys = keyNames.slice();
     columnState = parsed.columns.map(function (column) {
       if (previousTypes[column.name] && previousTypes[column.name] !== column.inferredType) {
         column.type = previousTypes[column.name];
       }
       return column;
     });
+    var available = {};
+    columnState.forEach(function (column) { available[column.name] = 1; });
+    keyNames = previousKeys.filter(function (name) { return available[name]; });
+    if (!keyNames.length) keyNames = defaultKeyColumnNames(columnState);
     renderMapping(columnState);
     renderOutputs();
   }

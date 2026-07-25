@@ -338,3 +338,52 @@ export function generateCsvLoadSql(tableNameRaw: string): string {
     `ON_ERROR = ABORT_STATEMENT;`,
   ].join("\n");
 }
+
+export function defaultKeyColumnNames(columns: ColumnSpec[]): string[] {
+  const idColumn = columns.find((column) => column.name.endsWith("_ID"));
+  if (idColumn) return [idColumn.name];
+  if (columns[0]) return [columns[0].name];
+  return [];
+}
+
+/** Block three: Type 1 MERGE. */
+export function generateMergeSql(
+  tableNameRaw: string,
+  columns: ColumnSpec[],
+  keyNames: string[],
+): string {
+  const tableName = resolvedTableName(tableNameRaw);
+  const staging = `${tableName}_STAGING`;
+  const keys = columns.filter((column) => keyNames.includes(column.name));
+  const nonKeys = columns.filter((column) => !keyNames.includes(column.name));
+  if (columns.length === 0 || keys.length === 0) return "";
+
+  const onClause = keys
+    .map((column) => `t.${column.name} = s.${column.name}`)
+    .join(" AND ");
+
+  const lines: string[] = [
+    `MERGE INTO ${tableName} AS t`,
+    `USING ${staging} AS s`,
+    `  ON ${onClause}`,
+  ];
+
+  if (nonKeys.length > 0) {
+    const nameWidth = Math.max(...nonKeys.map((column) => column.name.length));
+    const updates = nonKeys.map((column) => {
+      const padding = " ".repeat(nameWidth - column.name.length);
+      return `  t.${column.name}${padding} = s.${column.name}`;
+    });
+    lines.push(`WHEN MATCHED THEN UPDATE SET`);
+    lines.push(updates.join(",\n"));
+  }
+
+  const insertCols = columns.map((column) => column.name).join(", ");
+  const insertVals = columns.map((column) => `s.${column.name}`).join(", ");
+  lines.push(`WHEN NOT MATCHED THEN INSERT (`);
+  lines.push(`  ${insertCols}`);
+  lines.push(`) VALUES (`);
+  lines.push(`  ${insertVals}`);
+  lines.push(`);`);
+  return lines.join("\n");
+}

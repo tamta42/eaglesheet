@@ -111,6 +111,14 @@ const SHARED_CSS = `
     padding: 0.35rem 0.5rem; border: 1px solid var(--tt-line);
     border-radius: var(--tt-radius); background: #fff; color: var(--tt-ink);
   }
+  .key-list {
+    display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-top: 0.5rem;
+  }
+  .key-option {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    font-size: 0.9rem; color: var(--tt-ink); cursor: pointer;
+  }
+  .key-option input { accent-color: var(--tt-blue); }
   .sr-only {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
     overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
@@ -214,6 +222,7 @@ function renderHome(): string {
 
       <p id="parse-error" class="error" hidden></p>
       <div id="column-mapping" hidden></div>
+      <div id="key-columns" hidden></div>
 
       <section class="outputs" aria-live="polite">
         <div class="output-block">
@@ -223,6 +232,10 @@ function renderHome(): string {
         <div class="output-block">
           <h2>FILE FORMAT and COPY INTO</h2>
           <pre id="load-sql"></pre>
+        </div>
+        <div class="output-block">
+          <h2>MERGE</h2>
+          <pre id="merge-sql"></pre>
         </div>
       </section>
     `,

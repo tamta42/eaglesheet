@@ -2,6 +2,7 @@ import {
   detectFormat,
   generateCreateTableSql,
   generateCsvLoadSql,
+  generateMergeSql,
   inferColumnType,
   normalizeHeaderNames,
   normalizeIdentifier,
@@ -142,5 +143,44 @@ describe("CSV load SQL", () => {
         "ON_ERROR = ABORT_STATEMENT;",
       ].join("\n"),
     );
+  });
+});
+
+describe("MERGE SQL", () => {
+  it("matches the brief Type 1 MERGE shape for the worked example", () => {
+    const sample = [
+      "order_id,customer_name,order_total,ordered_at",
+      "1001,Acme Corp,1234567890.12,2024-01-15 10:30:00",
+      "1002,Beta Ltd,45.00,2024-01-16T14:22:01",
+    ].join("\n");
+    const parsed = parseCsv(sample);
+    const sql = generateMergeSql("MY_TABLE", parsed.columns, ["ORDER_ID"]);
+    expect(sql).toBe(
+      [
+        "MERGE INTO MY_TABLE AS t",
+        "USING MY_TABLE_STAGING AS s",
+        "  ON t.ORDER_ID = s.ORDER_ID",
+        "WHEN MATCHED THEN UPDATE SET",
+        "  t.CUSTOMER_NAME = s.CUSTOMER_NAME,",
+        "  t.ORDER_TOTAL   = s.ORDER_TOTAL,",
+        "  t.ORDERED_AT    = s.ORDERED_AT",
+        "WHEN NOT MATCHED THEN INSERT (",
+        "  ORDER_ID, CUSTOMER_NAME, ORDER_TOTAL, ORDERED_AT",
+        ") VALUES (",
+        "  s.ORDER_ID, s.CUSTOMER_NAME, s.ORDER_TOTAL, s.ORDERED_AT",
+        ");",
+      ].join("\n"),
+    );
+  });
+
+  it("omits WHEN MATCHED when every column is a key", () => {
+    const sample = "order_id,region_id\n1,2\n3,4";
+    const parsed = parseCsv(sample);
+    const sql = generateMergeSql("MY_TABLE", parsed.columns, [
+      "ORDER_ID",
+      "REGION_ID",
+    ]);
+    expect(sql).not.toContain("WHEN MATCHED");
+    expect(sql).toContain("WHEN NOT MATCHED THEN INSERT");
   });
 });
