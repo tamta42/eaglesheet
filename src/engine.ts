@@ -191,6 +191,86 @@ export function parseCsv(input: string): ParseResult {
   return { columns, rows, error: null };
 }
 
+const VARIANT_MARKER = "__EAGLESHEET_VARIANT__";
+
+function jsonScalarToSample(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "object") return VARIANT_MARKER;
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string") return value;
+  if (typeof value === "bigint") return value.toString();
+  return "";
+}
+
+export function parseJson(input: string): ParseResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(input) as unknown;
+  } catch {
+    return { columns: [], rows: [], error: "Sample is not valid JSON." };
+  }
+  const records: Record<string, unknown>[] = [];
+  if (Array.isArray(parsed)) {
+    for (let i = 0; i < parsed.length; i++) {
+      const item: unknown = parsed[i];
+      if (item === null || typeof item !== "object" || Array.isArray(item)) {
+        return {
+          columns: [],
+          rows: [],
+          error: `Array item ${String(i)} is not a JSON object.`,
+        };
+      }
+      records.push(item as Record<string, unknown>);
+    }
+  } else if (parsed !== null && typeof parsed === "object") {
+    records.push(parsed as Record<string, unknown>);
+  } else {
+    return {
+      columns: [],
+      rows: [],
+      error: "JSON sample must be an object or an array of objects.",
+    };
+  }
+  if (records.length === 0) {
+    return { columns: [], rows: [], error: "JSON array is empty." };
+  }
+
+  const headerFields: string[] = [];
+  const seen = new Set<string>();
+  for (const record of records) {
+    for (const key of Object.keys(record)) {
+      if (!seen.has(key)) {
+        seen.add(key);
+        headerFields.push(key);
+      }
+    }
+  }
+  const { names, renamed } = normalizeHeaderNames(headerFields);
+  const rows = records.map((record) =>
+    headerFields.map((key) => jsonScalarToSample(record[key])),
+  );
+  const columns: ColumnSpec[] = names.map((name, index) => {
+    const values = rows.map((row) => row[index] ?? "");
+    const inferredType = values.some((value) => value === VARIANT_MARKER)
+      ? "VARIANT"
+      : inferColumnType(values);
+    return {
+      originalName: headerFields[index] ?? "",
+      name,
+      inferredType,
+      type: inferredType,
+      renamed: renamed[index] ?? false,
+    };
+  });
+  return { columns, rows, error: null };
+}
+
+export function parseSample(input: string, format: SampleFormat): ParseResult {
+  if (!input.trim()) return { columns: [], rows: [], error: null };
+  return format === "json" ? parseJson(input) : parseCsv(input);
+}
+
 const INT_RE = /^[+-]?\d{1,38}$/;
 const DEC_RE = /^[+-]?\d+\.\d+$/;
 const SCI_RE = /^[+-]?(?:\d+\.?\d*|\.\d+)[eE][+-]?\d+$/;
@@ -337,6 +417,55 @@ export function generateCsvLoadSql(tableNameRaw: string): string {
     `FILE_FORMAT = (FORMAT_NAME = ${formatName})`,
     `ON_ERROR = ABORT_STATEMENT;`,
   ].join("\n");
+}
+
+function jsonPath(originalKey: string): string {
+  if (/^[A-Za-z_][A-Za-z0-9_$]*$/.test(originalKey)) {
+    return `RAW_DATA:${originalKey}`;
+  }
+  const escaped = originalKey.replace(/"/g, '""');
+  return `RAW_DATA:"${escaped}"`;
+}
+
+/** Block two for JSON: VARIANT landing table plus INSERT … SELECT. */
+export function generateJsonLoadSql(
+  tableNameRaw: string,
+  columns: ColumnSpec[],
+): string {
+  const tableName = resolvedTableName(tableNameRaw);
+  const formatName = `${tableName}_JSON_FORMAT`;
+  const rawTable = `${tableName}_RAW`;
+  const insertCols = columns.map((column) => column.name).join(", ");
+  const selectCols = columns
+    .map((column) => `  ${jsonPath(column.originalName)}::${column.type}`)
+    .join(",\n");
+  return [
+    `CREATE OR REPLACE FILE FORMAT ${formatName}`,
+    `  TYPE = JSON`,
+    `  STRIP_OUTER_ARRAY = TRUE;`,
+    ``,
+    `CREATE OR REPLACE TABLE ${rawTable} (RAW_DATA VARIANT);`,
+    ``,
+    `COPY INTO ${rawTable} (RAW_DATA)`,
+    `FROM @MY_STAGE/path/`,
+    `FILE_FORMAT = (FORMAT_NAME = ${formatName})`,
+    `ON_ERROR = ABORT_STATEMENT;`,
+    ``,
+    `INSERT INTO ${tableName} (${insertCols})`,
+    `SELECT`,
+    selectCols,
+    `FROM ${rawTable};`,
+  ].join("\n");
+}
+
+export function generateLoadSql(
+  tableNameRaw: string,
+  columns: ColumnSpec[],
+  format: SampleFormat,
+): string {
+  return format === "json"
+    ? generateJsonLoadSql(tableNameRaw, columns)
+    : generateCsvLoadSql(tableNameRaw);
 }
 
 export function defaultKeyColumnNames(columns: ColumnSpec[]): string[] {

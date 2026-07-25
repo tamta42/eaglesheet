@@ -2,11 +2,13 @@ import {
   detectFormat,
   generateCreateTableSql,
   generateCsvLoadSql,
+  generateJsonLoadSql,
   generateMergeSql,
   inferColumnType,
   normalizeHeaderNames,
   normalizeIdentifier,
   parseCsv,
+  parseJson,
 } from "../src/engine";
 import { describe, expect, it } from "vitest";
 
@@ -182,5 +184,41 @@ describe("MERGE SQL", () => {
     ]);
     expect(sql).not.toContain("WHEN MATCHED");
     expect(sql).toContain("WHEN NOT MATCHED THEN INSERT");
+  });
+});
+
+describe("JSON support", () => {
+  it("infers nested objects as VARIANT and uses original keys in load SQL", () => {
+    const sample = JSON.stringify([
+      {
+        order_id: 1001,
+        customer_name: "Acme Corp",
+        ordered_at: "2024-01-15 10:30:00",
+        meta: { source: "web" },
+      },
+      {
+        order_id: 1002,
+        customer_name: "Beta Ltd",
+        ordered_at: "2024-01-16T14:22:01",
+        meta: { source: "api" },
+      },
+    ]);
+    const parsed = parseJson(sample);
+    expect(parsed.error).toBeNull();
+    expect(parsed.columns.map((c) => [c.name, c.type, c.originalName])).toEqual(
+      [
+        ["ORDER_ID", "NUMBER(38,0)", "order_id"],
+        ["CUSTOMER_NAME", "VARCHAR", "customer_name"],
+        ["ORDERED_AT", "TIMESTAMP_NTZ", "ordered_at"],
+        ["META", "VARIANT", "meta"],
+      ],
+    );
+    const load = generateJsonLoadSql("MY_TABLE", parsed.columns);
+    expect(load).toContain("TYPE = JSON");
+    expect(load).toContain("MY_TABLE_RAW");
+    expect(load).toContain("RAW_DATA:order_id::NUMBER(38,0)");
+    expect(load).toContain("RAW_DATA:customer_name::VARCHAR");
+    expect(load).toContain("RAW_DATA:ordered_at::TIMESTAMP_NTZ");
+    expect(load).toContain("RAW_DATA:meta::VARIANT");
   });
 });

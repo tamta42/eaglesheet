@@ -151,6 +151,68 @@ export const CLIENT_SCRIPT = `
     return { columns: columns, rows: rows, error: null };
   }
 
+  var VARIANT_MARKER = "__EAGLESHEET_VARIANT__";
+
+  function jsonScalarToSample(value) {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "object") return VARIANT_MARKER;
+    if (typeof value === "boolean") return value ? "true" : "false";
+    if (typeof value === "number") return String(value);
+    if (typeof value === "string") return value;
+    return String(value);
+  }
+
+  function parseJson(input) {
+    var parsed;
+    try { parsed = JSON.parse(input); }
+    catch (e) { return { columns: [], rows: [], error: "Sample is not valid JSON." }; }
+    var records = [];
+    if (Array.isArray(parsed)) {
+      for (var i = 0; i < parsed.length; i++) {
+        var item = parsed[i];
+        if (item === null || typeof item !== "object" || Array.isArray(item)) {
+          return { columns: [], rows: [], error: "Array item " + i + " is not a JSON object." };
+        }
+        records.push(item);
+      }
+    } else if (parsed !== null && typeof parsed === "object") {
+      records.push(parsed);
+    } else {
+      return { columns: [], rows: [], error: "JSON sample must be an object or an array of objects." };
+    }
+    if (!records.length) return { columns: [], rows: [], error: "JSON array is empty." };
+    var headerFields = [];
+    var seen = {};
+    records.forEach(function (record) {
+      Object.keys(record).forEach(function (key) {
+        if (!seen[key]) { seen[key] = 1; headerFields.push(key); }
+      });
+    });
+    var normalised = normalizeHeaderNames(headerFields);
+    var rows = records.map(function (record) {
+      return headerFields.map(function (key) { return jsonScalarToSample(record[key]); });
+    });
+    var columns = normalised.names.map(function (name, index) {
+      var values = rows.map(function (row) { return row[index]; });
+      var inferredType = values.some(function (value) { return value === VARIANT_MARKER; })
+        ? "VARIANT"
+        : inferColumnType(values);
+      return {
+        originalName: headerFields[index],
+        name: name,
+        inferredType: inferredType,
+        type: inferredType,
+        renamed: normalised.renamed[index]
+      };
+    });
+    return { columns: columns, rows: rows, error: null };
+  }
+
+  function parseSample(input, format) {
+    if (!input.trim()) return { columns: [], rows: [], error: null };
+    return format === "json" ? parseJson(input) : parseCsv(input);
+  }
+
   function generateCreateTableSql(tableNameRaw, columns) {
     var tableName = normalizeHeaderNames([tableNameRaw || "MY_TABLE"]).names[0];
     var nameWidth = 1;
@@ -181,6 +243,44 @@ export const CLIENT_SCRIPT = `
       "FILE_FORMAT = (FORMAT_NAME = " + formatName + ")",
       "ON_ERROR = ABORT_STATEMENT;"
     ].join("\\n");
+  }
+
+  function jsonPath(originalKey) {
+    if (/^[A-Za-z_][A-Za-z0-9_$]*$/.test(originalKey)) return "RAW_DATA:" + originalKey;
+    return "RAW_DATA:" + String.fromCharCode(34) + originalKey.replace(/"/g, '""') + String.fromCharCode(34);
+  }
+
+  function generateJsonLoadSql(tableNameRaw, columns) {
+    var tableName = normalizeHeaderNames([tableNameRaw || "MY_TABLE"]).names[0];
+    var formatName = tableName + "_JSON_FORMAT";
+    var rawTable = tableName + "_RAW";
+    var insertCols = columns.map(function (column) { return column.name; }).join(", ");
+    var selectCols = columns.map(function (column) {
+      return "  " + jsonPath(column.originalName) + "::" + column.type;
+    }).join(",\\n");
+    return [
+      "CREATE OR REPLACE FILE FORMAT " + formatName,
+      "  TYPE = JSON",
+      "  STRIP_OUTER_ARRAY = TRUE;",
+      "",
+      "CREATE OR REPLACE TABLE " + rawTable + " (RAW_DATA VARIANT);",
+      "",
+      "COPY INTO " + rawTable + " (RAW_DATA)",
+      "FROM @MY_STAGE/path/",
+      "FILE_FORMAT = (FORMAT_NAME = " + formatName + ")",
+      "ON_ERROR = ABORT_STATEMENT;",
+      "",
+      "INSERT INTO " + tableName + " (" + insertCols + ")",
+      "SELECT",
+      selectCols,
+      "FROM " + rawTable + ";"
+    ].join("\\n");
+  }
+
+  function generateLoadSql(tableNameRaw, columns, format) {
+    return format === "json"
+      ? generateJsonLoadSql(tableNameRaw, columns)
+      : generateCsvLoadSql(tableNameRaw);
   }
 
   function defaultKeyColumnNames(columns) {
@@ -341,7 +441,7 @@ export const CLIENT_SCRIPT = `
       return;
     }
     createSqlEl.textContent = generateCreateTableSql(tableNameInput.value, columnState);
-    loadSqlEl.textContent = generateCsvLoadSql(tableNameInput.value);
+    loadSqlEl.textContent = generateLoadSql(tableNameInput.value, columnState, selectedFormat());
     mergeSqlEl.textContent = generateMergeSql(tableNameInput.value, columnState, keyNames);
   }
 
@@ -356,18 +456,7 @@ export const CLIENT_SCRIPT = `
       renderOutputs();
       return;
     }
-    if (format !== "csv") {
-      columnState = [];
-      keyNames = [];
-      renderMapping([]);
-      createSqlEl.textContent = "";
-      loadSqlEl.textContent = "";
-      mergeSqlEl.textContent = "";
-      errorEl.hidden = false;
-      errorEl.textContent = "JSON support lands in a later commit. Switch to CSV for now.";
-      return;
-    }
-    var parsed = parseCsv(sample.value);
+    var parsed = parseSample(sample.value, format);
     if (parsed.error) {
       columnState = [];
       keyNames = [];
