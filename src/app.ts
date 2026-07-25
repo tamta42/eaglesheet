@@ -1,9 +1,10 @@
 import { CLIENT_SCRIPT } from "./client-script";
+import { FORMAT_SCRIPT } from "./format-script";
 import { html, methodNotAllowed } from "./http";
 import { LINT_SCRIPT } from "./lint-script";
 import type { AppContext } from "./platform";
 
-type NavKey = "hub" | "scaffold" | "lint" | "about" | "privacy";
+type NavKey = "hub" | "scaffold" | "lint" | "format" | "about" | "privacy";
 
 const THEME_DEFAULT = "dark";
 
@@ -129,14 +130,29 @@ const SHARED_CSS = `
     text-transform: uppercase; color: var(--tt-muted); margin: 0 0 0.25rem;
   }
   .finding-msg { margin: 0; color: var(--tt-ink); }
-  #sql-input {
+  #sql-input, #format-input {
     width: 100%; min-height: 14rem; resize: vertical;
     padding: 0.85rem 1rem; border: 1px solid var(--tt-line);
     border-radius: var(--tt-radius); background: var(--tt-surface);
     color: var(--tt-ink); font-family: var(--tt-font-mono); font-size: 0.85rem;
     line-height: 1.45;
   }
-  #sql-input:focus { outline: 2px solid var(--tt-blue); outline-offset: 1px; }
+  #sql-input:focus, #format-input:focus { outline: 2px solid var(--tt-blue); outline-offset: 1px; }
+  #format-output {
+    margin: 0; min-height: 8rem; padding: 0.85rem 1rem;
+    border: 1px solid var(--tt-line); border-radius: var(--tt-radius);
+    background: var(--tt-surface); color: var(--tt-ink);
+    font-family: var(--tt-font-mono); font-size: 0.85rem; line-height: 1.45;
+    white-space: pre-wrap; overflow-x: auto;
+  }
+  .option-row {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem;
+    margin: 0.75rem 0 0;
+  }
+  .option-row label {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    font-size: 0.9rem; color: var(--tt-muted); cursor: pointer;
+  }
   .lint-summary { margin: 1rem 0 0; font-family: var(--tt-font-mono); font-size: 0.82rem; color: var(--tt-muted); }
   h1 {
     margin: 0 0 0.75rem; font-size: 1.85rem; font-weight: 700;
@@ -349,6 +365,7 @@ function layout(options: {
         ${navLink("/", "Tools", "hub", active)}
         ${navLink("/scaffold", "Scaffold", "scaffold", active)}
         ${navLink("/lint", "Lint", "lint", active)}
+        ${navLink("/format", "Format", "format", active)}
         ${navLink("/about", "About", "about", active)}
         ${navLink("/privacy", "Privacy", "privacy", active)}
         ${THEME_TOGGLE}
@@ -374,13 +391,13 @@ function renderHub(): string {
   return layout({
     title: "eaglesheet — data toolkit",
     description:
-      "Small in-browser tools for data work: Snowflake SQL scaffolding and an SQL linter.",
+      "Small in-browser tools for data work: Snowflake SQL scaffolding, linting, and formatting.",
     canonical: "/",
     active: "hub",
     body: `
       <h1>eaglesheet</h1>
       <p class="privacy-banner">Everything runs in your browser. Nothing you paste is uploaded to eaglesheet.</p>
-      <p class="lede">A pocket toolkit for data engineers — scaffold Snowflake SQL from a sample, lint SQL for common footguns, more tools later.</p>
+      <p class="lede">A pocket toolkit for data engineers — scaffold Snowflake SQL from a sample, lint and format SQL, more tools later.</p>
 
       <h2>Tools</h2>
       <ul class="tool-list">
@@ -391,6 +408,10 @@ function renderHub(): string {
         <li>
           <a class="tool-name" href="/lint">Lint</a>
           <p>Rule-based SQL checks for unbalanced syntax, missing WHERE, SELECT *, cartesian risk, and a few Snowflake nits.</p>
+        </li>
+        <li>
+          <a class="tool-name" href="/format">Format</a>
+          <p>Paste messy SQL and get readable warehouse-style formatting — clause breaks, keyword case, preserved strings.</p>
         </li>
       </ul>
     `,
@@ -504,6 +525,38 @@ function renderLint(): string {
   });
 }
 
+function renderFormat(): string {
+  return layout({
+    title: "Format — eaglesheet",
+    description:
+      "In-browser SQL formatter for warehouse SQL. Paste messy queries, get readable layout.",
+    canonical: "/format",
+    active: "format",
+    script: FORMAT_SCRIPT,
+    body: `
+      <h1>Format</h1>
+      <p class="privacy-banner">SQL is formatted in your browser. Nothing is sent to eaglesheet.</p>
+      <p class="lede">Quick readability pass — clause breaks, keyword casing, preserved strings and comments. Companion to <a href="/lint">Lint</a>.</p>
+
+      <label class="field-label" for="format-input">SQL</label>
+      <textarea id="format-input" spellcheck="false" placeholder="Paste a query or DML statement."></textarea>
+      <div class="sample-actions option-row">
+        <button type="button" class="example-btn" id="load-format-example">Load example</button>
+        <label><input type="checkbox" id="uppercase-keywords" checked /> Uppercase keywords</label>
+      </div>
+
+      <section class="output-block" aria-live="polite">
+        <div class="output-head">
+          <h2>Formatted</h2>
+          <button type="button" class="copy-btn" data-copy="format-output">Copy</button>
+        </div>
+        <pre id="format-output"></pre>
+      </section>
+      <p id="format-empty" class="empty-state">Paste SQL above to format it.</p>
+    `,
+  });
+}
+
 function renderAbout(): string {
   return layout({
     title: "About — eaglesheet",
@@ -512,7 +565,7 @@ function renderAbout(): string {
     active: "about",
     body: `
       <h1>About</h1>
-      <p>eaglesheet is a pocket toolkit for data engineers: scaffold Snowflake SQL from a CSV or JSON sample, and lint SQL for common footguns.</p>
+      <p>eaglesheet is a pocket toolkit for data engineers: scaffold Snowflake SQL from a CSV or JSON sample, lint SQL for common footguns, and format messy SQL for readability.</p>
       <p>It assumes you already know Snowflake. The point is removing tedious typing and catching obvious mistakes before a worksheet run.</p>
       <p>Part of the <a href="https://congtam.net">congtam.net</a> portfolio. No accounts, no saved state, no server-side processing of your inputs. See <a href="/privacy">Privacy</a>.</p>
     `,
@@ -527,7 +580,7 @@ function renderPrivacy(): string {
     active: "privacy",
     body: `
       <h1>Privacy</h1>
-      <p>Scaffolding and linting run entirely in your browser. Pasted, uploaded, or URL-loaded samples — and SQL you lint — are never posted to eaglesheet, logged, or stored.</p>
+      <p>Scaffolding, linting, and formatting run entirely in your browser. Pasted, uploaded, or URL-loaded samples — and SQL you lint or format — are never posted to eaglesheet, logged, or stored.</p>
       <p>Loading a public URL uses your browser to fetch the file directly. The Worker serves HTML and records a traffic datapoint (path, country, method, status). It does not see sample or SQL content.</p>
       <p>No accounts, cookies for tracking, or third-party analytics. See also the portfolio notes on <a href="https://congtam.net">congtam.net</a>.</p>
     `,
@@ -565,6 +618,9 @@ export function handleApp(
   }
   if (path === "/lint") {
     return html(renderLint(), context.requestId);
+  }
+  if (path === "/format") {
+    return html(renderFormat(), context.requestId);
   }
   if (path === "/about") {
     return html(renderAbout(), context.requestId);

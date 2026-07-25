@@ -9,6 +9,7 @@ describe("toolkit routes", () => {
     expect(body).toContain("Data toolkit");
     expect(body).toContain('href="/scaffold"');
     expect(body).toContain('href="/lint"');
+    expect(body).toContain('href="/format"');
     expect(body).toContain("data-theme-toggle");
     expect(body).not.toContain('id="sample"');
   });
@@ -37,6 +38,17 @@ describe("toolkit routes", () => {
     expect(body).toContain("load-lint-example");
     expect(body).toContain("lintSql");
     expect(body).toContain("SQL is checked in your browser");
+  });
+
+  it("serves the format tool", async () => {
+    const response = await SELF.fetch("https://eaglesheet.com/format");
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('id="format-input"');
+    expect(body).toContain("load-format-example");
+    expect(body).toContain("formatSql");
+    expect(body).toContain("SQL is formatted in your browser");
+    expect(body).toContain("uppercase-keywords");
   });
 
   it("privacy page explains client-side processing", async () => {
