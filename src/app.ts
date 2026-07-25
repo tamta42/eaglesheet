@@ -86,6 +86,26 @@ const SHARED_CSS = `
   #sample:focus {
     outline: 2px solid var(--tt-blue); outline-offset: 1px;
   }
+  .sample-actions {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem;
+    margin: 0.55rem 0 0; font-size: 0.9rem; color: var(--tt-muted);
+  }
+  .file-upload {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+  }
+  .file-upload input[type="file"] {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+  .file-upload-btn {
+    appearance: none; border: 1px solid var(--tt-line);
+    background: var(--tt-paper); color: var(--tt-ink);
+    font-family: var(--tt-font-display); font-size: 0.85rem;
+    padding: 0.35rem 0.7rem; border-radius: var(--tt-radius); cursor: pointer;
+  }
+  .file-upload-btn:hover { color: var(--tt-blue); border-color: var(--tt-blue); }
+  .file-upload-btn:focus-visible { outline: 2px solid var(--tt-clay); outline-offset: 2px; }
+  #file-name { font-family: var(--tt-font-mono); font-size: 0.78rem; color: var(--tt-muted); }
   .table-name-row { margin: 1rem 0 0; }
   #table-name {
     width: min(100%, 20rem); padding: 0.55rem 0.75rem;
@@ -239,9 +259,14 @@ function renderHome(): string {
         <p id="format-hint"></p>
       </div>
       <textarea id="sample" name="sample" spellcheck="false" placeholder="Paste a CSV header plus a few rows, or a JSON object / array."></textarea>
-      <p style="margin:0.55rem 0 0;font-size:0.9rem;color:var(--tt-muted)">
+      <div class="sample-actions">
+        <label class="file-upload">
+          <input id="sample-file" type="file" accept=".csv,.json,.txt,text/csv,application/json,text/plain" />
+          <span class="file-upload-btn" id="sample-file-btn" tabindex="0" role="button">Upload file</span>
+        </label>
+        <span id="file-name" aria-live="polite"></span>
         <button type="button" class="example-btn" id="load-example">Load worked example</button>
-      </p>
+      </div>
 
       <div class="table-name-row">
         <label class="field-label" for="table-name">Table name</label>
@@ -252,7 +277,7 @@ function renderHome(): string {
       <div id="column-mapping" hidden></div>
       <div id="key-columns" hidden></div>
 
-      <p id="empty-state" class="empty-state">Paste a sample above, or load the worked example, to generate Snowflake SQL.</p>
+      <p id="empty-state" class="empty-state">Paste or upload a sample, or load the worked example, to generate Snowflake SQL.</p>
 
       <section class="outputs" id="outputs" hidden aria-live="polite">
         <div class="output-block">

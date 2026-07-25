@@ -21,6 +21,8 @@ describe("static profile", () => {
     expect(body).toContain('name="format"');
     expect(body).toContain("detectFormat");
     expect(body).toContain("load-example");
+    expect(body).toContain('id="sample-file"');
+    expect(body).toContain("Upload file");
     expect(body).toContain("data-copy");
     expect(body).toContain("empty-state");
   });

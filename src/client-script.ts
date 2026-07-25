@@ -334,10 +334,14 @@ export const CLIENT_SCRIPT = `
   var emptyState = document.getElementById("empty-state");
   var outputs = document.getElementById("outputs");
   var loadExampleBtn = document.getElementById("load-example");
+  var sampleFile = document.getElementById("sample-file");
+  var sampleFileBtn = document.getElementById("sample-file-btn");
+  var fileNameEl = document.getElementById("file-name");
   var userPickedFormat = false;
   var columnState = [];
   var keyNames = [];
   var debounceTimer = null;
+  var MAX_FILE_BYTES = 2 * 1024 * 1024;
 
   var WORKED_EXAMPLE = [
     "order_id,customer_name,order_total,is_priority,ordered_at",
@@ -520,11 +524,67 @@ export const CLIENT_SCRIPT = `
     });
   }
 
-  sample.addEventListener("input", onSampleInput);
+  function formatFromFilename(name) {
+    var lower = String(name || "").toLowerCase();
+    if (lower.endsWith(".json")) return "json";
+    if (lower.endsWith(".csv") || lower.endsWith(".txt")) return "csv";
+    return null;
+  }
+
+  function loadSampleText(text, filename) {
+    sample.value = text;
+    if (fileNameEl) fileNameEl.textContent = filename || "";
+    var fromName = formatFromFilename(filename);
+    var format = fromName || detectFormat(text);
+    userPickedFormat = false;
+    setFormat(format, true);
+    regenerate();
+  }
+
+  function onFileSelected(file) {
+    if (!file) return;
+    if (file.size > MAX_FILE_BYTES) {
+      errorEl.hidden = false;
+      errorEl.textContent = "File is larger than 2 MB. Use a smaller sample.";
+      sampleFile.value = "";
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function () {
+      var text = typeof reader.result === "string" ? reader.result : "";
+      loadSampleText(text, file.name);
+      sampleFile.value = "";
+    };
+    reader.onerror = function () {
+      errorEl.hidden = false;
+      errorEl.textContent = "Could not read that file.";
+      sampleFile.value = "";
+    };
+    reader.readAsText(file);
+  }
+
+  sample.addEventListener("input", function () {
+    if (fileNameEl) fileNameEl.textContent = "";
+    onSampleInput();
+  });
   tableNameInput.addEventListener("input", scheduleRegenerate);
+  if (sampleFileBtn && sampleFile) {
+    sampleFileBtn.addEventListener("click", function () { sampleFile.click(); });
+    sampleFileBtn.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        sampleFile.click();
+      }
+    });
+    sampleFile.addEventListener("change", function () {
+      var file = sampleFile.files && sampleFile.files[0];
+      onFileSelected(file);
+    });
+  }
   loadExampleBtn.addEventListener("click", function () {
     userPickedFormat = false;
     tableNameInput.value = "MY_TABLE";
+    if (fileNameEl) fileNameEl.textContent = "";
     sample.value = WORKED_EXAMPLE;
     setFormat("csv", true);
     regenerate();
