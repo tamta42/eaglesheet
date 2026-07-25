@@ -17,6 +17,9 @@ describe("static profile", () => {
     expect(body).toContain("tamta-tokens.css");
     expect(body).toContain("mark-tile.svg");
     expect(body).toContain("congtam.net");
+    expect(body).toContain('id="sample"');
+    expect(body).toContain('name="format"');
+    expect(body).toContain("detectFormat");
   });
 
   it("serves about and privacy pages", async () => {

@@ -1,3 +1,4 @@
+import { CLIENT_SCRIPT } from "./client-script";
 import { html, methodNotAllowed } from "./http";
 import type { AppContext } from "./platform";
 
@@ -33,10 +34,15 @@ const SHARED_CSS = `
   .nav { display: flex; align-items: center; gap: 1rem; }
   .nav a { font-size: 0.9rem; color: var(--tt-muted); }
   .nav a:hover { color: var(--tt-blue); }
-  .page { flex: 1; width: min(720px, 100%); margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+  .page { flex: 1; width: min(760px, 100%); margin: 0 auto; padding: 2rem 1.25rem 3rem; }
   h1 {
     margin: 0 0 0.75rem; font-size: 1.85rem; font-weight: 700;
     letter-spacing: -0.03em; color: var(--tt-blue); line-height: 1.2;
+  }
+  h2 {
+    margin: 0 0 0.65rem; font-size: 0.78rem; font-weight: 500;
+    font-family: var(--tt-font-mono); text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--tt-muted);
   }
   p { margin: 0 0 1rem; line-height: 1.55; color: var(--tt-ink); }
   .lede { color: var(--tt-muted); font-size: 1.05rem; }
@@ -47,6 +53,40 @@ const SHARED_CSS = `
     color: var(--tt-ink); font-size: 0.95rem; line-height: 1.45;
   }
   .mono { font-family: var(--tt-font-mono); font-size: 0.9rem; }
+  .field-label {
+    display: block; margin: 0 0 0.4rem;
+    font-size: 0.78rem; font-weight: 500; font-family: var(--tt-font-mono);
+    text-transform: uppercase; letter-spacing: 0.08em; color: var(--tt-muted);
+  }
+  .format-row {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem;
+    margin: 0 0 0.75rem;
+  }
+  .format-toggle {
+    display: inline-flex; border: 1px solid var(--tt-line); border-radius: var(--tt-radius);
+    overflow: hidden;
+  }
+  .format-toggle label {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    padding: 0.4rem 0.75rem; font-size: 0.85rem; cursor: pointer;
+    color: var(--tt-muted); background: var(--tt-paper);
+  }
+  .format-toggle label:has(input:checked) {
+    color: var(--tt-ink); background: color-mix(in srgb, var(--tt-sand) 45%, var(--tt-paper));
+  }
+  .format-toggle input { accent-color: var(--tt-blue); }
+  #format-hint { font-size: 0.85rem; color: var(--tt-muted); margin: 0; }
+  #sample {
+    width: 100%; min-height: 12rem; resize: vertical;
+    padding: 0.85rem 1rem; border: 1px solid var(--tt-line);
+    border-radius: var(--tt-radius); background: #fff;
+    color: var(--tt-ink); font-family: var(--tt-font-mono); font-size: 0.85rem;
+    line-height: 1.45;
+  }
+  #sample:focus {
+    outline: 2px solid var(--tt-blue); outline-offset: 1px;
+  }
+  .outputs { margin-top: 2rem; }
   footer {
     margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--tt-line);
     display: flex; align-items: center; gap: 0.45rem; font-size: 0.85rem;
@@ -61,10 +101,12 @@ function layout(options: {
   description: string;
   canonical?: string;
   body: string;
+  script?: string;
 }): string {
   const canonical = options.canonical
     ? `<link rel="canonical" href="${options.canonical}" />`
     : "";
+  const script = options.script ? `<script>${options.script}</script>` : "";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -101,6 +143,7 @@ function layout(options: {
       </footer>
     </main>
   </div>
+  ${script}
 </body>
 </html>`;
 }
@@ -111,11 +154,26 @@ function renderHome(): string {
     description:
       "Paste a CSV or JSON sample and get CREATE TABLE, COPY INTO, and MERGE SQL for Snowflake. Everything runs in the browser.",
     canonical: "/",
+    script: CLIENT_SCRIPT,
     body: `
       <h1>eaglesheet</h1>
       <p class="privacy-banner">Everything runs in your browser. The sample never leaves this page.</p>
       <p class="lede">Paste a few rows of real data and get production-ready Snowflake SQL — table DDL, load statements, and a Type 1 MERGE.</p>
-      <p class="mono">Input and generators land in the next commits.</p>
+
+      <label class="field-label" for="sample">Sample</label>
+      <div class="format-row">
+        <div class="format-toggle" role="group" aria-label="Sample format">
+          <label><input type="radio" name="format" value="csv" checked /> CSV</label>
+          <label><input type="radio" name="format" value="json" /> JSON</label>
+        </div>
+        <p id="format-hint"></p>
+      </div>
+      <textarea id="sample" name="sample" spellcheck="false" placeholder="Paste a CSV header plus a few rows, or a JSON object / array."></textarea>
+
+      <section class="outputs" aria-live="polite">
+        <h2>Output</h2>
+        <p class="mono">SQL blocks land in the next commits.</p>
+      </section>
     `,
   });
 }
