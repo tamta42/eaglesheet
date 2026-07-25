@@ -311,3 +311,30 @@ export function generateCreateTableSql(
     columns.map((column) => ({ name: column.name, type: column.type })),
   );
 }
+
+export function resolvedTableName(tableNameRaw: string): string {
+  return (
+    normalizeHeaderNames([tableNameRaw || "MY_TABLE"]).names[0] ?? "MY_TABLE"
+  );
+}
+
+/** Block two: CSV FILE FORMAT + COPY INTO. */
+export function generateCsvLoadSql(tableNameRaw: string): string {
+  const tableName = resolvedTableName(tableNameRaw);
+  const formatName = `${tableName}_CSV_FORMAT`;
+  return [
+    `CREATE OR REPLACE FILE FORMAT ${formatName}`,
+    `  TYPE = CSV`,
+    `  FIELD_DELIMITER = ','`,
+    `  SKIP_HEADER = 1`,
+    `  FIELD_OPTIONALLY_ENCLOSED_BY = '"'`,
+    `  TRIM_SPACE = TRUE`,
+    `  NULL_IF = ('', 'NULL', 'null', '\\\\N')`,
+    `  EMPTY_FIELD_AS_NULL = TRUE;`,
+    ``,
+    `COPY INTO ${tableName}`,
+    `FROM @MY_STAGE/path/`,
+    `FILE_FORMAT = (FORMAT_NAME = ${formatName})`,
+    `ON_ERROR = ABORT_STATEMENT;`,
+  ].join("\n");
+}

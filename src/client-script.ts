@@ -161,6 +161,28 @@ export const CLIENT_SCRIPT = `
     return "CREATE OR REPLACE TABLE " + tableName + " (\\n" + lines.join(",\\n") + "\\n);";
   }
 
+  function generateCsvLoadSql(tableNameRaw) {
+    var tableName = normalizeHeaderNames([tableNameRaw || "MY_TABLE"]).names[0];
+    var formatName = tableName + "_CSV_FORMAT";
+    var q = String.fromCharCode(34);
+    var nullToken = "'" + "\\\\\\\\" + "N'";
+    return [
+      "CREATE OR REPLACE FILE FORMAT " + formatName,
+      "  TYPE = CSV",
+      "  FIELD_DELIMITER = ','",
+      "  SKIP_HEADER = 1",
+      "  FIELD_OPTIONALLY_ENCLOSED_BY = '" + q + "'",
+      "  TRIM_SPACE = TRUE",
+      "  NULL_IF = ('', 'NULL', 'null', " + nullToken + ")",
+      "  EMPTY_FIELD_AS_NULL = TRUE;",
+      "",
+      "COPY INTO " + tableName,
+      "FROM @MY_STAGE/path/",
+      "FILE_FORMAT = (FORMAT_NAME = " + formatName + ")",
+      "ON_ERROR = ABORT_STATEMENT;"
+    ].join("\\n");
+  }
+
   var sample = document.getElementById("sample");
   var tableNameInput = document.getElementById("table-name");
   var formatInputs = document.querySelectorAll('input[name="format"]');
@@ -168,6 +190,7 @@ export const CLIENT_SCRIPT = `
   var errorEl = document.getElementById("parse-error");
   var mappingEl = document.getElementById("column-mapping");
   var createSqlEl = document.getElementById("create-sql");
+  var loadSqlEl = document.getElementById("load-sql");
   var userPickedFormat = false;
   var columnState = [];
   var debounceTimer = null;
@@ -245,9 +268,11 @@ export const CLIENT_SCRIPT = `
   function renderOutputs() {
     if (!columnState.length) {
       createSqlEl.textContent = "";
+      loadSqlEl.textContent = "";
       return;
     }
     createSqlEl.textContent = generateCreateTableSql(tableNameInput.value, columnState);
+    loadSqlEl.textContent = generateCsvLoadSql(tableNameInput.value);
   }
 
   function regenerate() {
@@ -264,6 +289,7 @@ export const CLIENT_SCRIPT = `
       columnState = [];
       renderMapping([]);
       createSqlEl.textContent = "";
+      loadSqlEl.textContent = "";
       errorEl.hidden = false;
       errorEl.textContent = "JSON support lands in a later commit. Switch to CSV for now.";
       return;
@@ -273,6 +299,7 @@ export const CLIENT_SCRIPT = `
       columnState = [];
       renderMapping([]);
       createSqlEl.textContent = "";
+      loadSqlEl.textContent = "";
       errorEl.hidden = false;
       errorEl.textContent = parsed.error;
       return;

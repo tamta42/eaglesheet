@@ -1,6 +1,7 @@
 import {
   detectFormat,
   generateCreateTableSql,
+  generateCsvLoadSql,
   inferColumnType,
   normalizeHeaderNames,
   normalizeIdentifier,
@@ -117,6 +118,28 @@ describe("parseCsv and CREATE TABLE", () => {
         "  IS_PRIORITY   BOOLEAN,",
         "  ORDERED_AT    TIMESTAMP_NTZ",
         ");",
+      ].join("\n"),
+    );
+  });
+});
+
+describe("CSV load SQL", () => {
+  it("matches the brief FILE FORMAT and COPY INTO shape", () => {
+    expect(generateCsvLoadSql("MY_TABLE")).toBe(
+      [
+        "CREATE OR REPLACE FILE FORMAT MY_TABLE_CSV_FORMAT",
+        "  TYPE = CSV",
+        "  FIELD_DELIMITER = ','",
+        "  SKIP_HEADER = 1",
+        "  FIELD_OPTIONALLY_ENCLOSED_BY = '\"'",
+        "  TRIM_SPACE = TRUE",
+        "  NULL_IF = ('', 'NULL', 'null', '\\\\N')",
+        "  EMPTY_FIELD_AS_NULL = TRUE;",
+        "",
+        "COPY INTO MY_TABLE",
+        "FROM @MY_STAGE/path/",
+        "FILE_FORMAT = (FORMAT_NAME = MY_TABLE_CSV_FORMAT)",
+        "ON_ERROR = ABORT_STATEMENT;",
       ].join("\n"),
     );
   });

@@ -220,6 +220,10 @@ function renderHome(): string {
           <h2>CREATE TABLE</h2>
           <pre id="create-sql"></pre>
         </div>
+        <div class="output-block">
+          <h2>FILE FORMAT and COPY INTO</h2>
+          <pre id="load-sql"></pre>
+        </div>
       </section>
     `,
   });
