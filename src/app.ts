@@ -175,6 +175,18 @@ const SHARED_CSS = `
   .file-upload-btn:hover { color: var(--tt-blue); border-color: var(--tt-blue); }
   .file-upload-btn:focus-visible { outline: 2px solid var(--tt-clay); outline-offset: 2px; }
   #file-name { font-family: var(--tt-font-mono); font-size: 0.78rem; color: var(--tt-muted); }
+  .url-row { margin: 1rem 0 0; }
+  .url-load-row {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.55rem;
+  }
+  #sample-url {
+    flex: 1 1 16rem; min-width: 0; padding: 0.55rem 0.75rem;
+    border: 1px solid var(--tt-line); border-radius: var(--tt-radius);
+    font-family: var(--tt-font-mono); font-size: 0.85rem; color: var(--tt-ink);
+    background: var(--tt-surface);
+  }
+  #sample-url:focus { outline: 2px solid var(--tt-blue); outline-offset: 1px; }
+  .url-hint { margin: 0.45rem 0 0; font-size: 0.85rem; color: var(--tt-muted); }
   .table-name-row { margin: 1rem 0 0; }
   #table-name {
     width: min(100%, 20rem); padding: 0.55rem 0.75rem;
@@ -339,6 +351,18 @@ function renderHome(): string {
         <button type="button" class="example-btn" id="load-example">Load worked example</button>
       </div>
 
+      <div class="url-row">
+        <label class="field-label" for="sample-url">Sample URL</label>
+        <div class="url-load-row">
+          <input id="sample-url" name="sample-url" type="url" spellcheck="false" autocomplete="off" placeholder="https://example.com/data.csv" />
+          <button type="button" class="file-upload-btn" id="load-url">Load URL</button>
+        </div>
+        <p class="url-hint">
+          <button type="button" class="example-btn" id="seed-url">Try iris CSV</button>
+          — small public Plotly dataset via jsDelivr (fetched in your browser).
+        </p>
+      </div>
+
       <div class="table-name-row">
         <label class="field-label" for="table-name">Table name</label>
         <input id="table-name" name="table-name" type="text" value="MY_TABLE" spellcheck="false" autocomplete="off" />
@@ -348,7 +372,7 @@ function renderHome(): string {
       <div id="column-mapping" hidden></div>
       <div id="key-columns" hidden></div>
 
-      <p id="empty-state" class="empty-state">Paste or upload a sample, or load the worked example, to generate Snowflake SQL.</p>
+      <p id="empty-state" class="empty-state">Paste, upload, or load a sample URL — or use the worked example — to generate Snowflake SQL.</p>
 
       <section class="outputs" id="outputs" hidden aria-live="polite">
         <div class="output-block">
@@ -399,8 +423,8 @@ function renderPrivacy(): string {
     canonical: "/privacy",
     body: `
       <h1>Privacy</h1>
-      <p>Parsing, type inference, and SQL generation run entirely in your browser. The pasted sample is never posted, logged, or stored.</p>
-      <p>The Worker serves HTML and records a traffic datapoint (path, country, method, status). It does not see sample content.</p>
+      <p>Parsing, type inference, and SQL generation run entirely in your browser. Pasted, uploaded, or URL-loaded samples are never posted to eaglesheet, logged, or stored.</p>
+      <p>Loading a public URL uses your browser to fetch the file directly. The Worker serves HTML and records a traffic datapoint (path, country, method, status). It does not see sample content.</p>
       <p>No accounts, cookies for tracking, or third-party analytics. See also the portfolio notes on <a href="https://congtam.net">congtam.net</a>.</p>
     `,
   });

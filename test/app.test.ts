@@ -23,11 +23,28 @@ describe("static profile", () => {
     expect(body).toContain("load-example");
     expect(body).toContain('id="sample-file"');
     expect(body).toContain("Upload file");
+    expect(body).toContain('id="sample-url"');
+    expect(body).toContain('id="load-url"');
+    expect(body).toContain("Try iris CSV");
+    expect(body).toContain(
+      "https://cdn.jsdelivr.net/gh/plotly/datasets@master/iris.csv",
+    );
     expect(body).toContain("data-copy");
     expect(body).toContain("empty-state");
     expect(body).toContain('data-theme="dark"');
     expect(body).toContain("tt-theme");
     expect(body).toContain("data-theme-toggle");
+    expect(response.headers.get("content-security-policy")).toContain(
+      "connect-src https:",
+    );
+  });
+
+  it("privacy page explains client-side URL fetch", async () => {
+    const privacy = await SELF.fetch("https://eaglesheet.com/privacy");
+    expect(privacy.status).toBe(200);
+    const body = await privacy.text();
+    expect(body).toContain("URL-loaded");
+    expect(body).toContain("fetch the file directly");
   });
 
   it("serves about and privacy pages", async () => {
@@ -37,7 +54,9 @@ describe("static profile", () => {
 
     const privacy = await SELF.fetch("https://eaglesheet.com/privacy");
     expect(privacy.status).toBe(200);
-    expect(await privacy.text()).toContain("never posted, logged, or stored");
+    expect(await privacy.text()).toContain(
+      "never posted to eaglesheet, logged, or stored",
+    );
   });
 
   it("serves a branded 404", async () => {

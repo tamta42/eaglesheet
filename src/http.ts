@@ -19,7 +19,8 @@ export const PAGE_CSP = [
   "style-src 'self' 'unsafe-inline' https://congtam.net https://fonts.googleapis.com",
   "font-src https://fonts.gstatic.com",
   "script-src 'unsafe-inline'",
-  "connect-src 'none'",
+  // Client-side sample URL loads only — the Worker never sees the response body.
+  "connect-src https:",
 ].join("; ");
 
 const BASE_CSP = [

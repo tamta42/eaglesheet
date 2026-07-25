@@ -337,11 +337,16 @@ export const CLIENT_SCRIPT = `
   var sampleFile = document.getElementById("sample-file");
   var sampleFileBtn = document.getElementById("sample-file-btn");
   var fileNameEl = document.getElementById("file-name");
+  var sampleUrlInput = document.getElementById("sample-url");
+  var loadUrlBtn = document.getElementById("load-url");
+  var seedUrlBtn = document.getElementById("seed-url");
   var userPickedFormat = false;
   var columnState = [];
   var keyNames = [];
   var debounceTimer = null;
+  var urlLoading = false;
   var MAX_FILE_BYTES = 2 * 1024 * 1024;
+  var EXAMPLE_SAMPLE_URL = "https://cdn.jsdelivr.net/gh/plotly/datasets@master/iris.csv";
 
   var WORKED_EXAMPLE = [
     "order_id,customer_name,order_total,is_priority,ordered_at",
@@ -531,6 +536,16 @@ export const CLIENT_SCRIPT = `
     return null;
   }
 
+  function showError(message) {
+    errorEl.hidden = false;
+    errorEl.textContent = message;
+  }
+
+  function clearError() {
+    errorEl.hidden = true;
+    errorEl.textContent = "";
+  }
+
   function loadSampleText(text, filename) {
     sample.value = text;
     if (fileNameEl) fileNameEl.textContent = filename || "";
@@ -544,23 +559,90 @@ export const CLIENT_SCRIPT = `
   function onFileSelected(file) {
     if (!file) return;
     if (file.size > MAX_FILE_BYTES) {
-      errorEl.hidden = false;
-      errorEl.textContent = "File is larger than 2 MB. Use a smaller sample.";
+      showError("File is larger than 2 MB. Use a smaller sample.");
       sampleFile.value = "";
       return;
     }
     var reader = new FileReader();
     reader.onload = function () {
       var text = typeof reader.result === "string" ? reader.result : "";
+      clearError();
       loadSampleText(text, file.name);
       sampleFile.value = "";
     };
     reader.onerror = function () {
-      errorEl.hidden = false;
-      errorEl.textContent = "Could not read that file.";
+      showError("Could not read that file.");
       sampleFile.value = "";
     };
     reader.readAsText(file);
+  }
+
+  function filenameFromUrl(url) {
+    var parts = url.pathname.split("/").filter(Boolean);
+    return parts.length ? parts[parts.length - 1] : "remote";
+  }
+
+  function setUrlBusy(busy) {
+    urlLoading = busy;
+    if (loadUrlBtn) loadUrlBtn.disabled = busy;
+    if (seedUrlBtn) seedUrlBtn.disabled = busy;
+    if (loadUrlBtn) loadUrlBtn.textContent = busy ? "Loading…" : "Load URL";
+  }
+
+  function loadFromUrl(rawUrl) {
+    if (urlLoading) return;
+    var trimmed = String(rawUrl || "").trim();
+    if (!trimmed) {
+      showError("Enter a public https URL to a CSV or JSON file.");
+      return;
+    }
+    var url;
+    try {
+      url = new URL(trimmed);
+    } catch (e) {
+      showError("That is not a valid URL.");
+      return;
+    }
+    if (url.protocol !== "https:") {
+      showError("Use an https URL. http and other schemes are blocked.");
+      return;
+    }
+    setUrlBusy(true);
+    clearError();
+    fetch(url.toString(), { method: "GET", redirect: "follow", credentials: "omit" })
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error("URL returned status " + response.status + ".");
+        }
+        var declared = Number(response.headers.get("content-length") || "0");
+        if (Number.isFinite(declared) && declared > MAX_FILE_BYTES) {
+          throw new Error("File is larger than 2 MB. Use a smaller sample.");
+        }
+        return response.text().then(function (text) {
+          var bytes = new TextEncoder().encode(text).byteLength;
+          if (bytes > MAX_FILE_BYTES) {
+            throw new Error("File is larger than 2 MB. Use a smaller sample.");
+          }
+          if (!text.trim()) {
+            throw new Error("URL returned an empty body.");
+          }
+          return { text: text, name: filenameFromUrl(url) };
+        });
+      })
+      .then(function (result) {
+        if (sampleUrlInput) sampleUrlInput.value = url.toString();
+        loadSampleText(result.text, result.name);
+      })
+      .catch(function (err) {
+        var message = err && err.message ? err.message : "Could not fetch that URL.";
+        if (/Failed to fetch|NetworkError|TypeError/i.test(String(message))) {
+          message = "Could not fetch that URL. It may block browser requests (CORS) or be unreachable.";
+        }
+        showError(message);
+      })
+      .then(function () {
+        setUrlBusy(false);
+      });
   }
 
   sample.addEventListener("input", function () {
@@ -579,6 +661,25 @@ export const CLIENT_SCRIPT = `
     sampleFile.addEventListener("change", function () {
       var file = sampleFile.files && sampleFile.files[0];
       onFileSelected(file);
+    });
+  }
+  if (loadUrlBtn) {
+    loadUrlBtn.addEventListener("click", function () {
+      loadFromUrl(sampleUrlInput ? sampleUrlInput.value : "");
+    });
+  }
+  if (sampleUrlInput) {
+    sampleUrlInput.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        loadFromUrl(sampleUrlInput.value);
+      }
+    });
+  }
+  if (seedUrlBtn) {
+    seedUrlBtn.addEventListener("click", function () {
+      if (sampleUrlInput) sampleUrlInput.value = EXAMPLE_SAMPLE_URL;
+      loadFromUrl(EXAMPLE_SAMPLE_URL);
     });
   }
   loadExampleBtn.addEventListener("click", function () {
